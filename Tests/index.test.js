@@ -572,8 +572,8 @@ describe('Arena Operation', () => {
 
         const space = await axios.post(`${BACKEND_SERVER}/api/v1/space/`,{
             name: "Test",
-          dimensions: "100x200",
-          mapId: mapId 
+            dimensions: "100x200",
+            mapId: mapId 
        },{
         headers:{
             "authorization": `Bearer ${userToken}`
