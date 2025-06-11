@@ -43,7 +43,7 @@ adminRouter.put("/element/:elementId",adminMiddleware,async (req,res)=>{
     res.status(200).json({message:"Success"})
 })
 
-adminRouter.post("/avatar",userMiddleware, async (req, res) => {
+adminRouter.post("/avatar",adminMiddleware, async (req, res) => {
     const parsedData = CreateAvatarSchema.safeParse(req.body)
     if (!parsedData.success) {
         console.log("parsed data incorrect")

@@ -185,7 +185,7 @@ spaceRouter.post("/element",userMiddleware,async(req,res)=>{
         res.status(400).json({message:"Space not found"})
         return;
     }
-    await client.spaceElements.create({
+    const elementRes = await client.spaceElements.create({
         data:{
             elementId: parsedData.data.elementId,
             spaceId: parsedData.data.spaceId,
@@ -193,6 +193,7 @@ spaceRouter.post("/element",userMiddleware,async(req,res)=>{
             y: parsedData.data.y,     
         }
     })
+    console.log("element added " + elementRes.id)
     console.log("element added")
     res.status(200).json({message:"Element added"});
 })
