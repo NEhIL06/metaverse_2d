@@ -6,7 +6,7 @@ import { wss } from '..';
 
 // Initialize Redis client
 import {createClient} from "redis";
-const redis = createClient({
+const redis = createClient({ // I have deleted this don't bother :)
     username: 'default',
     password: 'OEw0VMQ4p5X4Xv2zDUJePIOj3jlLmw7Z',
     socket: {
