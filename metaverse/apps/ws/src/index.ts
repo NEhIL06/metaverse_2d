@@ -3,7 +3,7 @@ import { WebSocketServer } from 'ws';
 import { User } from './User';
 import { connectMongo } from './db/mongodb';
 import {createClient} from "redis";
-const redis = createClient({
+const redis = createClient({ // don't bother I have deleted this
     username: 'default',
     password: 'OEw0VMQ4p5X4Xv2zDUJePIOj3jlLmw7Z',
     socket: {
