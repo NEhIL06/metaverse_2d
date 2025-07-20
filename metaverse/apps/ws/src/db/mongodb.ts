@@ -2,7 +2,7 @@
 import { MongoClient, Db } from 'mongodb';
 
 // MongoDB connection configuration
-const mongoUrl = process.env.MONGO_URL || 'mongodb+srv://esteemshiz:c24psbJct4znQ-W@cluster0.pn2n6eu.mongodb.net/';
+const mongoUrl = process.env.MONGO_URL || 'mongodb+srv://esteemshiz:c24psbJct4znQ-W@cluster0.pn2n6eu.mongodb.net/';// don't bother I have deleted this :)
 let db: Db;
 
 // Initialize MongoDB connection
