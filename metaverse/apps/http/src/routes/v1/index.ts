@@ -14,7 +14,9 @@ export const router = Router();
 router.post("/signup", async (req, res) => {
     console.log("inside signup")
     // check the user
+
     const parsedData = SignupSchema.safeParse(req.body)
+    console.log("parsed data",parsedData)
     if (!parsedData.success) {
         console.log("parsed data incorrect")
         res.status(400).json({message: "Validation failed"})
@@ -22,6 +24,7 @@ router.post("/signup", async (req, res) => {
     }
 
     const hashedPassword = await hash(parsedData.data.password)
+    console.log("hashed password")
 
     try {
          const user = await client.user.create({
@@ -31,6 +34,7 @@ router.post("/signup", async (req, res) => {
                 role: parsedData.data.type === "admin" ? "Admin" : "User",
             }
         })
+        console.log("user created",user)
         res.status(200).json({
             userId: user.id
         })

@@ -4,4 +4,4 @@ import { PrismaClient } from '../../../packages/database/src/generated/prisma';
 const app = express();
 app.use(express.json());
 app.use("/api/v1",router)   
-app.listen(process.env.PORT || 3000)
+app.listen( 3000)
