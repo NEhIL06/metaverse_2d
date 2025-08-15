@@ -84,6 +84,7 @@ export class User {
                         }
                     }, this, this.spaceId!);
                     break;
+
                 case "move":
                     const moveX = parsedData.payload.x;
                     const moveY = parsedData.payload.y;
@@ -109,7 +110,8 @@ export class User {
                             y: this.y
                         }
                     });
-                    break;      
+                    break;
+
                 case "groupChat":
                     console.log("groupChat")   
                     const groupId = parsedData.payload.groupId;
@@ -121,6 +123,89 @@ export class User {
                             message
                         }
                     }, this, this.spaceId!);
+                    break;
+
+                case "privateChat":
+                    const privateChatMessage = parsedData.payload.message;
+                    const privateChatUserId = parsedData.payload.userId;
+                    const privateChatSpaceId = parsedData.payload.spaceId;
+                    RoomManager.getInstance().sendPrivateMessage({
+                        type: "privateChat",
+                        payload: {
+                            message: privateChatMessage,
+                            userId: privateChatUserId,
+                            spaceId: privateChatSpaceId
+                        }
+                    }, privateChatUserId, privateChatSpaceId);
+                    break;
+
+                case "user:call":
+                    console.log("User call from", this.id, "to", parsedData.payload.to);
+                    const to = parsedData.payload.to;
+                    const offer = parsedData.payload.offer;
+                    RoomManager.getInstance().sendOffer({
+                        type: "incomming:call",
+                        payload: {
+                            from: this.id,
+                            offer
+                        }
+                    }, to, this.spaceId!);
+                    break;
+
+                case "call:accepted":
+                    console.log("Call accepted from", this.id, "to", parsedData.payload.to);
+                    const acceptedTo = parsedData.payload.to;
+                    const ans = parsedData.payload.ans;
+                    RoomManager.getInstance().sendOffer({
+                        type: "call:accepted",
+                        payload: {
+                            from: this.id,
+                            ans
+                        }
+                    }, acceptedTo, this.spaceId!);
+                    break;
+
+                case "peer:nego:needed":
+                    console.log("peer:nego:needed", parsedData.payload.offer);
+                    const negoTo = parsedData.payload.to;
+                    const negoOffer = parsedData.payload.offer;
+                    RoomManager.getInstance().sendOffer({
+                        type: "peer:nego:needed",
+                        payload: {
+                            from: this.id,
+                            offer: negoOffer
+                        }
+                    }, negoTo, this.spaceId!);
+                    break;
+
+                case "peer:nego:done":
+                    console.log("peer:nego:done", parsedData.payload.ans);
+                    const negoDoneTo = parsedData.payload.to;
+                    const negoDoneAns = parsedData.payload.ans;
+                    RoomManager.getInstance().sendOffer({
+                        type: "peer:nego:final",
+                        payload: {
+                            from: this.id,
+                            ans: negoDoneAns
+                        }
+                    }, negoDoneTo, this.spaceId!);
+                    break;
+
+                case "ice:candidate":
+                    console.log("ICE candidate from", this.id, "to", parsedData.payload.to);
+                    const iceTo = parsedData.payload.to;
+                    const candidate = parsedData.payload.candidate;
+                    RoomManager.getInstance().sendOffer({
+                        type: "ice:candidate",
+                        payload: {
+                            from: this.id,
+                            candidate
+                        }
+                    }, iceTo, this.spaceId!);
+                    break;
+
+                default:
+                    console.log("Unknown message type:", parsedData.type);
                     break;
             }
         });

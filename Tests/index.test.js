@@ -1,4 +1,5 @@
 const axios2 = require("axios");
+const test = require("node:test");
 
 const BACKEND_SERVER = "http://localhost:3000"
 const ws_url = "ws://localhost:8000"
@@ -1102,6 +1103,22 @@ describe('Websocket Layer', () => {
         expect(message.payload.groupId).toBe(spaceId)
         expect(message.payload.message).toBe("Hello everyone!")
     })
+    test("User can send private message to other user", async () => {
+            ws1.send(JSON.stringify({
+                type: "privateChat",
+                payload: {
+                    message: "Hello there!",
+                    userId: userId,
+                    spaceId: spaceId
+                }
+            }));
+
+            const message = await waitForAndPopLatestMessage(ws2Messages);
+            expect(message.type).toBe("privateChat")
+            expect(message.payload.message).toBe("Hello there!")
+            expect(message.payload.userId).toBe(userId)
+            expect(message.payload.spaceId).toBe(spaceId)
+    })
 
     test("If a user leaves, the other user receives a leave event", async () => {
         ws1.close()
@@ -1109,6 +1126,8 @@ describe('Websocket Layer', () => {
         expect(message.type).toBe("user-left")
         expect(message.payload.userId).toBe(adminId)
     })
+
+    
 });
 
 // describe('Websocket Layer', () => {

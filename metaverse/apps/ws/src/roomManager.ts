@@ -41,4 +41,26 @@ export class RoomManager {
             }
         });
     }
+
+    public sendPrivateMessage(message:OutgoingMessage, userId: string, spaceId: string) {
+        if(!this.rooms.has(spaceId)) {
+            return;
+        }
+        this.rooms.get(spaceId)?.forEach((u) => {
+            if (u.id === userId) {
+                u.send(message);
+            }
+        });
+    }
+    
+    public sendOffer(message: OutgoingMessage, userId: string, spaceId: string) {
+        if(!this.rooms.has(spaceId)) {
+            return;
+        }
+        this.rooms.get(spaceId)?.forEach((u) => {
+            if (u.id === userId) {
+                u.send(message);
+            }
+        });
+    }
 }
