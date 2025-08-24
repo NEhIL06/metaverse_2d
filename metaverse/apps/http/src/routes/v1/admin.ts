@@ -45,11 +45,13 @@ adminRouter.put("/element/:elementId",adminMiddleware,async (req,res)=>{
 
 adminRouter.post("/avatar",adminMiddleware, async (req, res) => {
     const parsedData = CreateAvatarSchema.safeParse(req.body)
+    console.log("parsed data", parsedData)
     if (!parsedData.success) {
         console.log("parsed data incorrect")
         res.status(400).json({message: "Validation failed"})
         return
     }
+    console.log("parsed data correct")
     const avatar = await client.avatar.create({
         data: {
             name: parsedData.data.name,

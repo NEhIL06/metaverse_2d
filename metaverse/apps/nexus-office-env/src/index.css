@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Virtual Office Design System - Modern collaboration theme */
+
+@layer base {
+  :root {
+    /* Base colors - Dark modern theme */
+    --background: 220 13% 6%;
+    --foreground: 220 13% 95%;
+
+    /* Card system - Dark elevated surfaces */
+    --card: 220 13% 8%;
+    --card-foreground: 220 13% 95%;
+
+    /* Popover system */
+    --popover: 220 13% 8%;
+    --popover-foreground: 220 13% 95%;
+
+    /* Primary brand - Vibrant blue */
+    --primary: 245 100% 65%;
+    --primary-foreground: 220 13% 6%;
+    --primary-hover: 245 100% 70%;
+    --primary-glow: 245 100% 75%;
+
+    /* Secondary - Dark surface */
+    --secondary: 220 13% 12%;
+    --secondary-foreground: 220 13% 95%;
+    --secondary-hover: 220 13% 15%;
+
+    /* Muted - Darker background elements */
+    --muted: 220 13% 10%;
+    --muted-foreground: 220 9% 65%;
+
+    /* Accent - Vibrant purple/pink */
+    --accent: 315 100% 65%;
+    --accent-foreground: 220 13% 6%;
+    --accent-hover: 315 100% 70%;
+    --accent-glow: 315 100% 75%;
+
+    /* Status colors */
+    --success: 142 76% 55%;
+    --success-foreground: 220 13% 6%;
+    --warning: 38 92% 60%;
+    --warning-foreground: 220 13% 6%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 220 13% 6%;
+
+    /* Interactive elements */
+    --border: 220 13% 15%;
+    --input: 220 13% 12%;
+    --ring: 245 100% 65%;
+
+    --radius: 0.5rem;
+
+    /* Gradients - Vibrant modern theme */
+    --gradient-primary: linear-gradient(135deg, hsl(245 100% 65%) 0%, hsl(245 100% 75%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(315 100% 65%) 0%, hsl(315 100% 75%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(245 100% 65%) 0%, hsl(315 100% 65%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(220 13% 6%) 0%, hsl(220 13% 10%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(220 13% 8%) 0%, hsl(220 13% 12%) 100%);
+
+    /* Shadows - Vibrant glow system */
+    --shadow-sm: 0 1px 2px hsl(245 100% 65% / 0.15);
+    --shadow-md: 0 4px 6px -1px hsl(245 100% 65% / 0.15), 0 2px 4px -1px hsl(245 100% 65% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(245 100% 65% / 0.15), 0 4px 6px -2px hsl(245 100% 65% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(245 100% 65% / 0.15), 0 10px 10px -5px hsl(245 100% 65% / 0.1);
+    --shadow-glow: 0 0 30px hsl(245 100% 75% / 0.4);
+    --shadow-accent-glow: 0 0 30px hsl(315 100% 75% / 0.4);
+
+    /* Animations - Smooth transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Typography scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    --font-size-4xl: 2.25rem;
+
+    /* Spacing scale for consistent layouts */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    --space-3xl: 4rem;
+
+    --sidebar-background: 220 13% 8%;
+    --sidebar-foreground: 220 13% 95%;
+    --sidebar-primary: 245 100% 65%;
+    --sidebar-primary-foreground: 220 13% 6%;
+    --sidebar-accent: 220 13% 12%;
+    --sidebar-accent-foreground: 220 13% 95%;
+    --sidebar-border: 220 13% 15%;
+    --sidebar-ring: 245 100% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

@@ -14,6 +14,7 @@ spaceRouter.get("/all",adminMiddleware,async(req,res)=>{
                 creatorId: req.userId!
             }
         });
+        console.log("spaces found", spaces.length);
         res.json({
             spaces: spaces.map(s => ({
                 id: s.id,

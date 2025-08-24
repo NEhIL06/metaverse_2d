@@ -62,8 +62,8 @@ export class User {
                     console.log("jouin receiverdfd 4")
                     this.spaceId = spaceId
                     RoomManager.getInstance().addUser(spaceId, this);
-                    this.x = Math.floor(Math.random() * space?.width);
-                    this.y = Math.floor(Math.random() * space?.height);
+                    this.x = Math.floor(Math.random() * space.width);
+                    this.y = Math.floor(Math.random() * space.height);
                     this.send({
                         type: "space-joined",
                         payload: {
@@ -71,6 +71,7 @@ export class User {
                                 x: this.x,
                                 y: this.y
                             },
+                            userId:this.userId,
                             users: RoomManager.getInstance().rooms.get(spaceId)?.filter(x => x.id !== this.id)?.map((u) => ({id: u.id})) ?? []// users ka id jo us room mei hai
                         }
                     });

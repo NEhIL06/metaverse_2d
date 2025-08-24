@@ -36,6 +36,9 @@ router.post("/signup", async (req, res) => {
         })
         console.log("user created",user)
         res.status(200).json({
+            message: "User created successfully",
+            username: user.username,
+            role: user.role,
             userId: user.id
         })
         return;
@@ -106,6 +109,12 @@ router.get("/avatars", async (req, res) => {
             name: a.name,
             imageUrl: a.imageUrl
         }))
+    })
+})
+
+router.get("/health",(req,res) => {
+    res.status(200).json({
+        status: "ok"
     })
 })
 

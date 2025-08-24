@@ -3,6 +3,13 @@ import jwt from "jsonwebtoken";
 import { JWT_PASSWORD } from "../constants";
 import { NextFunction, Request, Response } from "express";
 
+declare global {
+    namespace Express {
+        interface Request {
+            userId?: string;
+        }
+    }
+}
 
 export const adminMiddleware = (req:Request,res:Response,next:NextFunction) => {
     const header = req.headers["authorization"];

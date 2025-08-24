@@ -42,16 +42,48 @@ export class RoomManager {
         });
     }
 
-    public sendPrivateMessage(message:OutgoingMessage, userId: string, spaceId: string) {
-        if(!this.rooms.has(spaceId)) {
-            return;
+    public sendPrivateMessage(message: OutgoingMessage, userId: string, spaceId: string): boolean {
+        // Validate inputs
+        if (!spaceId || !userId) {
+          console.error(`Invalid input: spaceId=${spaceId}, userId=${userId}`);
+          return false;
         }
-        this.rooms.get(spaceId)?.forEach((u) => {
-            if (u.id === userId) {
-                u.send(message);
-            }
-        });
-    }
+    
+        // Check if the room exists
+        const room = this.rooms.get(spaceId);
+        if (!room) {
+          console.warn(`Room not found for spaceId: ${spaceId}`);
+          return false;
+        }
+    
+        // Find the target user
+        let targetUser: User | undefined;
+        for (const user of room) {
+          if (user.id === userId) {
+            targetUser = user;
+            break;
+          }
+        }
+    
+        // Check if the user was found
+        if (!targetUser) {
+          console.warn(`User not found: userId=${userId} in spaceId=${spaceId}`);
+          return false;
+        }
+    
+        try {
+          // Serialize the message if needed (e.g., for WebSocket)
+          const serializedMessage = JSON.stringify(message);
+          console.log(`Sending private message to user ${userId} in space ${spaceId}:`, serializedMessage);
+          
+          // Send the message
+          targetUser.send(serializedMessage);
+          return true;
+        } catch (error) {
+          console.error(`Failed to send private message to user ${userId} in space ${spaceId}:`, error);
+          return false;
+        }
+      }
     
     public sendOffer(message: OutgoingMessage, userId: string, spaceId: string) {
         if(!this.rooms.has(spaceId)) {
