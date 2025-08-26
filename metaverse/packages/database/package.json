@@ -9,6 +9,10 @@
     "./client": "./src/index.ts"
   },
   "scripts": {
+    "build": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "generate": "prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -269,6 +269,93 @@ Upon connection, the client should immediately join a space:
 - 401/403 from API: Verify `Authorization: Bearer <token>` header and user role when accessing admin routes.
 - WS disconnects on join: The join payload must include a valid JWT (from `/signin`) and a real `spaceId`.
 
+## Deploy to Render
+
+You can deploy this monorepo to Render using either the Blueprint (single-click) flow or by creating services manually.
+
+### Option A: Render Blueprint (recommended)
+
+Prereqs: You have pushed this repo to GitHub and have a Render account.
+
+1) Place the Blueprint file at the repo root
+
+- If `render.yaml` is inside `metaverse/`, move it to the repository root as `render.yaml` so Render can detect it.
+- The Blueprint defines 3 services and a PostgreSQL database:
+  - Web service: HTTP API (`metaverse-http-api`)
+  - Web service: WebSocket server (`metaverse-websocket`)
+  - Static site: Frontend (`metaverse-frontend`)
+  - Database: PostgreSQL (`metaverse-db`)
+
+2) Commit and push the Blueprint
+
+```bash
+git add render.yaml
+git commit -m "chore: add Render blueprint"
+git push
+```
+
+3) Create a Blueprint on Render
+
+- In Render: New → Blueprint
+- Select your GitHub repo
+- Review the services and click Apply.
+
+4) Configure environment variables (Render UI → each service → Environment)
+
+- HTTP API (web service):
+  - `NODE_ENV=production`
+  - `PORT=3000`
+  - `JWT_PASSWORD=<secure-random>`
+  - `DATABASE_URL` (auto-wired from the Render PostgreSQL database if using the Blueprint)
+- WebSocket (web service):
+  - `NODE_ENV=production`
+  - `PORT=8000`
+  - `JWT_PASSWORD=<same-as-http>`
+  - `DATABASE_URL` (auto-wired if using the Blueprint)
+- Frontend (static site): after the API/WS deploys, set:
+  - `VITE_API_URL=https://<your-http-api>.onrender.com/api/v1`
+  - `VITE_WS_URL=wss://<your-websocket>.onrender.com`
+
+5) Deploy and verify
+
+- Render will run `pnpm install && pnpm build` and apply database migrations automatically.
+- Visit the frontend URL, sign up, create/join a space, and confirm realtime works.
+
+Notes
+
+- If you keep the Blueprint in the repo root, the paths inside it (build commands, publish directory) are already set to work with the `metaverse/` subfolder.
+- If you adjust folder names, update paths accordingly in `render.yaml`.
+
+### Option B: Manual Services (without Blueprint)
+
+Create the following on Render:
+
+1) Database: PostgreSQL (`metaverse-db`). Copy the connection string as `DATABASE_URL`.
+
+2) HTTP API: Web Service
+- Build command: `cd metaverse && pnpm install && pnpm build`
+- Start command: `cd metaverse && pnpm --filter http start`
+- Env vars: `NODE_ENV=production`, `PORT=3000`, `JWT_PASSWORD=<secret>`, `DATABASE_URL=<from-db>`
+
+3) WebSocket: Web Service
+- Build command: `cd metaverse && pnpm install && pnpm build`
+- Start command: `cd metaverse && pnpm --filter ws start`
+- Env vars: `NODE_ENV=production`, `PORT=8000`, `JWT_PASSWORD=<same>`, `DATABASE_URL=<from-db>`
+
+4) Frontend: Static Site
+- Build command: `cd metaverse && pnpm install && pnpm --filter nexus-office-env build`
+- Publish directory: `apps/nexus-office-env/dist`
+- Env vars: set after backend URLs are known
+  - `VITE_API_URL=https://<your-http-api>.onrender.com/api/v1`
+  - `VITE_WS_URL=wss://<your-websocket>.onrender.com`
+
+5) Migrations
+
+- Migrations run during build (via `postbuild` hook). If needed, run manually from a shell:
+```bash
+pnpm --filter @repo/database migrate
+```
+
 ## License
 
 Add your preferred license here.

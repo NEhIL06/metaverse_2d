@@ -1,0 +1,55 @@
+services:
+  # HTTP API Service
+  - type: web
+    name: metaverse-http-api
+    runtime: node
+    plan: starter
+    buildCommand: cd metaverse && pnpm install && pnpm build
+    startCommand: cd metaverse && pnpm --filter http start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: JWT_PASSWORD
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: metaverse-db
+          property: connectionString
+
+  # WebSocket Service
+  - type: web
+    name: metaverse-websocket
+    runtime: node
+    plan: starter
+    buildCommand: cd metaverse && pnpm install && pnpm build
+    startCommand: cd metaverse && pnpm --filter ws start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: JWT_PASSWORD
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: metaverse-db
+          property: connectionString
+
+  # Frontend Service
+  - type: web
+    name: metaverse-frontend
+    runtime: static
+    buildCommand: cd metaverse && pnpm install && pnpm --filter nexus-office-env build
+    staticPublishPath: metaverse/apps/nexus-office-env/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://metaverse-http-api.onrender.com
+      - key: VITE_WS_URL
+        value: wss://metaverse-websocket.onrender.com
+
+databases:
+  - name: metaverse-db
+    databaseName: metaverse
+    user: metaverse

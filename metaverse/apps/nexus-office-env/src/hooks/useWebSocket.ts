@@ -10,7 +10,7 @@ import type {
 } from '@/types/websocket';
 import type { UserPosition } from '@/types/space';
 
-const WS_URL = 'ws://localhost:8000';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 interface UseWebSocketProps {
   spaceId?: string;
