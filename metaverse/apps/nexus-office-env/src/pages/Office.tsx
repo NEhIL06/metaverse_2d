@@ -23,6 +23,7 @@ const Office = () => {
 
   const token = localStorage.getItem('token') || '';
 
+  const webSocketUrl = process.env.VITE_WS_URL || 'ws://localhost:8000';
   // Initialize WebSocket connection and handle URL params
   useEffect(() => {
     //const urlParams = new URLSearchParams(window.location.search);
@@ -31,7 +32,7 @@ const Office = () => {
     //setParams({ token, spaceId });
 
     // Initialize WebSocket
-    wsRef.current = new WebSocket('ws://localhost:8000'); // Replace with your WS_URL
+    wsRef.current = new WebSocket(webSocketUrl); // Replace with your WS_URL
     
     wsRef.current.onopen = () => {
       // Join the space once connected
