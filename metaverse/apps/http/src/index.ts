@@ -1,6 +1,6 @@
 import express from 'express';
 import { router } from './routes/v1';
-import { PrismaClient } from '../../../packages/database/src/generated/prisma'; 
+import { PrismaClient } from '@prisma/client'; 
 import cors from 'cors';
 import { PORT, NODE_ENV } from './constants';
 

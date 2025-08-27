@@ -16,9 +16,9 @@ This guide will help you deploy each service (HTTP API, WebSocket, Frontend) sep
    - Copy the **Internal Database URL** (you already have this)
    - Test connection if needed
 
-2. **Run Database Migrations**
-   - This will happen automatically during service builds
-   - If manual migration needed, use the database service shell
+2. **Database Migrations**
+   - Migrations will run automatically during service builds
+   - Each service has its own Prisma schema and will create tables
 
 ## Service 1: HTTP API
 
@@ -41,7 +41,7 @@ DATABASE_URL=postgresql://metaverse_or64_user:9CrDeuHDJdZP3PkS3jdbTef8laibzTLj@d
 
 ### Deploy
 - Click **Create Web Service**
-- Wait for build to complete
+- Wait for build to complete (includes Prisma client generation and migrations)
 - Note the service URL (e.g., `https://metaverse-http-api.onrender.com`)
 
 ## Service 2: WebSocket Server
@@ -65,7 +65,7 @@ DATABASE_URL=postgresql://metaverse_or64_user:9CrDeuHDJdZP3PkS3jdbTef8laibzTLj@d
 
 ### Deploy
 - Click **Create Web Service**
-- Wait for build to complete
+- Wait for build to complete (includes Prisma client generation and migrations)
 - Note the service URL (e.g., `https://metaverse-websocket.onrender.com`)
 
 ## Service 3: Frontend
@@ -102,7 +102,12 @@ VITE_WS_URL=wss://metaverse-websocket.onrender.com
 
 ### CORS Configuration
 - The HTTP API is configured to allow your frontend domain
-- Update CORS in `apps/http/src/index.ts` if your frontend URL changes
+- Updated to automatically allow Render subdomains
+
+### Build Process
+- Each service now has its own Prisma schema
+- Build process includes: `prisma generate`, `prisma migrate deploy`, and `esbuild`
+- No more workspace dependency issues
 
 ## Verification Steps
 
@@ -119,6 +124,7 @@ VITE_WS_URL=wss://metaverse-websocket.onrender.com
 3. **Database Connection**
    - Check service logs for database connection success
    - Look for "Prisma Client" initialization messages
+   - Verify tables are created
 
 4. **WebSocket Connection**
    - Sign up/sign in on frontend
@@ -131,11 +137,12 @@ VITE_WS_URL=wss://metaverse-websocket.onrender.com
 - Check that all dependencies are in `package.json`
 - Verify Node.js version (>=18)
 - Check build logs for specific errors
+- Ensure DATABASE_URL is correct
 
 ### Database Connection Issues
 - Verify `DATABASE_URL` is correct
 - Check database is running
-- Ensure migrations have run
+- Ensure migrations have run (check build logs)
 
 ### CORS Errors
 - Verify frontend URL is in CORS configuration

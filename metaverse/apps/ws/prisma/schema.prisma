@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String @id @default(cuid())
+  username String @unique
+  password String
+  role     Role   @default(USER)
+  avatar   Avatar? @relation(fields: [avatarId], references: [id])
+  avatarId String?
+  spaces   Space[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Avatar {
+  id     String @id @default(cuid())
+  name   String
+  imageUrl String
+  users  User[]
+}
+
+model Space {
+  id         String @id @default(cuid())
+  name       String
+  width      Int
+  height     Int
+  thumbnail  String?
+  creatorId  String
+  creator    User   @relation(fields: [creatorId], references: [id])
+  elements   SpaceElement[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SpaceElement {
+  id        String @id @default(cuid())
+  spaceId   String
+  space     Space  @relation(fields: [spaceId], references: [id])
+  elementId String
+  element   Element @relation(fields: [elementId], references: [id])
+  x         Int
+  y         Int
+}
+
+model Element {
+  id        String @id @default(cuid())
+  imageUrl  String
+  width     Int
+  height    Int
+  static    Boolean @default(true)
+  spaces    SpaceElement[]
+  mapElements MapElement[]
+}
+
+model Map {
+  id             String @id @default(cuid())
+  name           String
+  thumbnail      String
+  dimensions     String
+  defaultElements MapElement[]
+}
+
+model MapElement {
+  id        String @id @default(cuid())
+  mapId     String
+  map       Map    @relation(fields: [mapId], references: [id])
+  elementId String
+  element   Element @relation(fields: [elementId], references: [id])
+  x         Int
+  y         Int
+}
+
+enum Role {
+  USER
+  ADMIN
+}

@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "build": "npx esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --tsconfig=tsconfig.json",
+    "build": "npx prisma generate && npx prisma migrate deploy && npx esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --tsconfig=tsconfig.json",
     "start": "node dist/index.js",
     "dev": "npm run build && npm run start",
     "postinstall": "npm run build"
@@ -14,7 +14,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@repo/database": "workspace:*",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/ws": "^8.18.1",
     "esbuild": "^0.25.5",
@@ -22,6 +21,10 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.17.0",
     "redis": "^5.6.0",
-    "ws": "^8.18.2"
+    "ws": "^8.18.2",
+    "@prisma/client": "^6.8.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.8.2"
   }
 }
