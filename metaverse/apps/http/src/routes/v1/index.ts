@@ -33,7 +33,7 @@ router.post("/signup", async (req, res) => {
             data: {
                 username: parsedData.data.username,
                 password: hashedPassword,
-                role: parsedData.data.type === "admin" ? "ADMIN" : "USER",
+                role: parsedData.data.type === "admin" ? "Admin" : "User",
             }
         })
         console.log("user created",user)

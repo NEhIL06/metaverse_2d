@@ -9,7 +9,7 @@ const app = express();
 // Configure CORS for production
 const corsOrigins = NODE_ENV === 'production' 
   ? [
-      'https://metaverse-frontend.onrender.com',
+      'https://metaverse-frontend-6gjy.onrender.com/',
       'https://*.onrender.com' // Allow any Render subdomain
     ] 
   : ['http://localhost:8080', 'http://localhost:5173'];
