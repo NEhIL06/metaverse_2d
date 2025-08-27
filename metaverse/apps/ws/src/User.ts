@@ -1,9 +1,10 @@
 import { WebSocket } from "ws";
 import { RoomManager } from "./roomManager";
 import { OutgoingMessage } from "./types";
-import client from "@repo/database/client";
+import {PrismaClient} from "@prisma/client"
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { JWT_PASSWORD } from "./config";
+const client = new PrismaClient();
 
 function getRandomString(length: number) {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
