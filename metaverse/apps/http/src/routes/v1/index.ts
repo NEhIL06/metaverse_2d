@@ -3,10 +3,12 @@ import { userRouter } from "./user";
 import { spaceRouter } from "./space";
 import { adminRouter } from "./admin";
 import { SigninSchema, SignupSchema } from "../../types";
-import client from "@repo/database/client"
+import { PrismaClient } from "@prisma/client"
 import {hash,compare} from "../../scrypt"
 import jwt from "jsonwebtoken";
 import { JWT_PASSWORD } from "../../constants";
+
+const client = new PrismaClient();
 
 
 export const router = Router();
@@ -31,7 +33,7 @@ router.post("/signup", async (req, res) => {
             data: {
                 username: parsedData.data.username,
                 password: hashedPassword,
-                role: parsedData.data.type === "admin" ? "Admin" : "User",
+                role: parsedData.data.type === "admin" ? "ADMIN" : "USER",
             }
         })
         console.log("user created",user)
