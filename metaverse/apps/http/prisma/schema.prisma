@@ -11,76 +11,73 @@ datasource db {
 }
 
 model User {
-  id       String @id @default(cuid())
-  username String @unique
+  id       String  @id @unique @default(cuid())
+  username String  @unique
   password String
-  role     Role   @default(USER)
-  avatar   Avatar? @relation(fields: [avatarId], references: [id])
   avatarId String?
+  role     Role
   spaces   Space[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Avatar {
-  id     String @id @default(cuid())
-  name   String
-  imageUrl String
-  users  User[]
+  avatar    Avatar? @relation(fields: [avatarId], references: [id])
 }
 
 model Space {
-  id         String @id @default(cuid())
-  name       String
-  width      Int
-  height     Int
-  thumbnail  String?
-  creatorId  String
-  creator    User   @relation(fields: [creatorId], references: [id])
-  elements   SpaceElement[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String  @id @unique @default(cuid())
+  name      String
+  width     Int
+  height    Int
+  thumbnail String?
+  creatorId String
+  creator     User    @relation(fields: [creatorId], references: [id])
+  elements  spaceElements[]
 }
 
-model SpaceElement {
-  id        String @id @default(cuid())
-  spaceId   String
-  space     Space  @relation(fields: [spaceId], references: [id])
+model spaceElements {
+  id        String @id @unique @default(cuid())
   elementId String
-  element   Element @relation(fields: [elementId], references: [id])
+  spaceId   String
   x         Int
   y         Int
+  space     Space  @relation(fields: [spaceId], references: [id])
+  element   Element @relation(fields: [elementId], references: [id])
 }
 
 model Element {
-  id        String @id @default(cuid())
-  imageUrl  String
-  width     Int
-  height    Int
-  static    Boolean @default(true)
-  spaces    SpaceElement[]
-  mapElements MapElement[]
+  id              String @id @unique @default(cuid())
+  width           Int
+  height          Int
+  static          Boolean
+  imageUrl        String
+  spaces          spaceElements[]
+  mapElements     MapElements[]
 }
 
 model Map {
-  id             String @id @default(cuid())
-  name           String
-  thumbnail      String
-  dimensions     String
-  defaultElements MapElement[]
+  id     String  @id @unique @default(cuid())
+  width  Int
+  height Int
+  name   String
+  thumbnail String
+  mapElements MapElements[]
 }
 
-model MapElement {
-  id        String @id @default(cuid())
+model MapElements {
+  id        String  @id @unique @default(cuid())
   mapId     String
-  map       Map    @relation(fields: [mapId], references: [id])
   elementId String
+  x         Int?
+  y         Int?
+  map       Map     @relation(fields: [mapId], references: [id])
   element   Element @relation(fields: [elementId], references: [id])
-  x         Int
-  y         Int
+}
+
+model Avatar {
+  id       String  @id @unique @default(cuid())
+  imageUrl String?
+  name     String?
+  users    User[]
 }
 
 enum Role {
-  USER
-  ADMIN
+  Admin
+  User
 }

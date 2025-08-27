@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { UpdateMetadataSchema } from "../../types";
-import client from "@repo/database/client"
+import { PrismaClient } from "@prisma/client"
 import { userMiddleware } from "../../middleware/user";
 export const userRouter = Router();
+const client = new PrismaClient();
 
 userRouter.post("/metadata",userMiddleware,async (req,res) => {
     const parsedData = UpdateMetadataSchema.safeParse(req.body)       

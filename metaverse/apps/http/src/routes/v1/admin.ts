@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { adminMiddleware } from "../../middleware/admin";
 import { CreateElementSchema, UpdateElementSchema,CreateAvatarSchema,CreateMapSchema} from "../../types";
-import client from "@repo/database/client";
+import { PrismaClient } from "@prisma/client"
 import { userMiddleware } from "../../middleware/user";
 export const adminRouter = Router();
+const client = new PrismaClient();
 
 adminRouter.post("/element",adminMiddleware,async (req,res)=>{
     const parsedData = CreateElementSchema.safeParse(req.body);
@@ -76,7 +77,7 @@ adminRouter.post("/map",adminMiddleware,async (req,res)=>{
             width: parseInt(parsedData.data.dimensions.split("x")[0]),
             height: parseInt(parsedData.data.dimensions.split("x")[1]),
             mapElements: {
-                create: parsedData.data.defaultElements.map(e=>({
+                create: parsedData.data.mapElements.map(e=>({
                     elementId: e.elementId,
                     x: e.x,
                     y: e.y
