@@ -1,28 +1,31 @@
-import express from 'express';
-import { router } from './routes/v1';
-import { PrismaClient } from '@prisma/client'; 
-import cors from 'cors';
-import { PORT, NODE_ENV } from './constants';
+import express from "express";
+import cors from "cors";
+import { router } from "./routes/v1";
+import { PORT, NODE_ENV } from "./constants";
 
 const app = express();
 
-// Configure CORS for production
-const corsOrigins = NODE_ENV === 'production' 
-  ? [
-      'https://metaverse-frontend-6gjy.onrender.com/',
-      'https://*.onrender.com' // Allow any Render subdomain
-    ] 
-  : ['http://localhost:8080', 'http://localhost:5173'];
+// Allowed origins (no trailing slashes!)
+const allowedOrigins =
+  NODE_ENV === "production"
+    ? ["https://metaverse-frontend-6gjy.onrender.com"]
+    : ["http://localhost:5173", "http://localhost:8080"];
 
-app.use(cors({
-    origin: corsOrigins,
-    credentials: true
-}));
+// CORS middleware
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
+// Routes
 app.use("/api/v1", router);
 
+// Start server
 app.listen(PORT, () => {
-    console.log(`HTTP API server running on port ${PORT}`);
-    console.log(`CORS origins: ${corsOrigins.join(', ')}`);
+  console.log(`HTTP API running on port ${PORT}`);
+  console.log("Allowed CORS origins:", allowedOrigins);
 });
