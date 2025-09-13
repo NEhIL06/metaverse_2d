@@ -64,7 +64,7 @@ export class User {
                     this.spaceId = spaceId
                     RoomManager.getInstance().addUser(spaceId, this);
                     this.x = Math.floor(Math.random() * space.width);
-                    this.y = Math.floor(Math.random() * space.height);
+                    this.y = Math.floor(Math.random() * space.height);// this is just for testing the APIs
                     this.send({
                         type: "space-joined",
                         payload: {

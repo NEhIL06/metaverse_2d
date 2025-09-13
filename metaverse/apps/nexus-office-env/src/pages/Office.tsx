@@ -91,8 +91,9 @@ const Office = () => {
             userId: message.payload.userId
           })
         
-        setx(message.payload.spawn.x );  
-        sety(message.payload.spawn.y);
+        
+        setx(Math.floor(Math.random() * breadth));  
+        sety(Math.floor(Math.random() * length));
           
         setCurrentUser({
           x: x,
