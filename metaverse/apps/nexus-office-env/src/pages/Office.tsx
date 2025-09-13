@@ -3,12 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { spaceAPI } from '@/lib/api';
 import Dashboard from './Dashboard';
 import { GroupChat } from '@/components/chat/GroupChat';
+import { set } from 'date-fns';
+import { Input } from '@/components/ui/input';
 
 const Office = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -19,6 +21,9 @@ const Office = () => {
   const [users, setUsers] = useState(new Map());
   const [length, setLength] = useState<any>('');
   const [breadth, setBreadth] = useState<any>('');
+  const [messages, setMessages] = useState<any[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
   const navigate = useNavigate();
 
   const token = localStorage.getItem('token') || '';
@@ -134,6 +139,11 @@ const Office = () => {
         });
         break;
 
+      case 'groupChat':
+        setMessages(prev => [...prev, message.payload]);      
+        break;
+      
+
       case 'movement-rejected':
         // Reset current user position if movement was rejected
         setCurrentUser((prev: any) => ({
@@ -161,18 +171,23 @@ const Office = () => {
     }
   };
 
-  const handleSendMessage = (message: string) => {
-    if (!currentUser) return;
+  const handleSendMessage = (text: string) => {
+    if (!currentUser || !spaceId || !text.trim()) return;
 
-    // Send chat message
-    wsRef.current.send(JSON.stringify({
+    const newMsg = { userId: currentUser.userId, message: text, timestamp: Date.now() };//new object bana rha hai kyu?
+    setMessages(prev => [...prev, newMsg]);
+
+    wsRef.current?.send(JSON.stringify({
       type: 'groupChat',
       payload: {
-        message,
+        userId: currentUser.userId,
+        message: text,
         groupId: spaceId,
+        timestamp: newMsg.timestamp,
       }
     }));
-  }
+  };
+
   // Handle user movement
   const handleMove = (newX: any, newY: any) => {
     if (!currentUser) return;
@@ -289,29 +304,74 @@ const Office = () => {
 
 
   return (
-    
     <div className="p-4" onKeyDown={handleKeyDown} tabIndex={0}>
-        <h1 className="text-2xl font-bold mb-4">Arena</h1>
-        <div className="mb-4">
-          <p className="text-sm text-gray-600">Token: {token}</p>
-          <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
-          <p className="text-sm text-gray-600">Connected Users: {users.size + (currentUser ? 1 : 0)}</p>
-          {/* <GroupChat
-          currentUserId={currentUser.userId}
-          onSendMessage={handleSendMessage()}
-          spaceId={spaceId}
-          /> */}
+      <h1 className="text-2xl font-bold mb-4">Arena</h1>
+      <div className="mb-4">
+        <p className="text-sm text-gray-600">Token: {token}</p>
+        <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
+        <p className="text-sm text-gray-600">Connected Users: {users.size + (currentUser ? 1 : 0)}</p>
+        <Button onClick={() => setChatOpen(true)}>Open Chat</Button>
+      </div>
+
+      <div className="border rounded-lg overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          width={length * 50}
+          height={breadth * 50}
+          className="bg-white"
+        />
+      </div>
+      <p className="mt-2 text-sm text-gray-500">Use arrow keys to move your avatar</p>
+
+      {/* ✅ Floating Chat Window */}
+      {chatOpen && (
+        <div className="fixed bottom-4 right-4 w-80 bg-white shadow-lg rounded-xl flex flex-col border z-50">
+          <div className="flex justify-between items-center p-2 border-b">
+            <h2 className="font-semibold">Group Chat</h2>
+            <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)}>
+              <X size={16} />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-64">
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`p-2 rounded-lg ${
+                  msg.userId === currentUser.userId ? 'bg-blue-100 text-right' : 'bg-gray-100 text-left'
+                }`}
+              >
+                <p className="text-xs text-gray-500">
+                  {msg.userId === currentUser.userId ? 'You' : `User ${msg.userId}`}
+                </p>
+                <p className="text-sm">{msg.message}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center p-2 border-t gap-2">
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Type a message..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSendMessage(chatInput);
+                  setChatInput('');
+                }
+              }}
+            />
+            <Button
+              onClick={() => {
+                handleSendMessage(chatInput);
+                setChatInput('');
+              }}
+            >
+              Send
+            </Button>
+          </div>
         </div>
-        <div className="border rounded-lg overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            width={length*50}
-            height={breadth*50}
-            className="bg-white"
-          />
-        </div>
-        
-        <p className="mt-2 text-sm text-gray-500">Use arrow keys to move your avatar</p>
+      )}
     </div>
   );
 };

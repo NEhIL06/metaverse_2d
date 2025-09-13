@@ -121,6 +121,7 @@ export class User {
                     RoomManager.getInstance().broadcast({
                         type: "groupChat",
                         payload: {
+                            userId: this.userId,
                             groupId,
                             message
                         }
