@@ -26,11 +26,19 @@ const Office = () => {
   const [chatInput, setChatInput] = useState('');
   const [x, setx] = useState(0);
   const [y, sety] = useState(0);
+  // Add camera offset state for following the user
+  const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
 
   const token = localStorage.getItem('token') || '';
 
   const webSocketUrl = import.meta.env.VITE_WS_URL;
+  
+  // Constants for canvas and grid
+  const GRID_SIZE = 50;
+  const CANVAS_WIDTH = 800; // Fixed canvas viewport width
+  const CANVAS_HEIGHT = 600; // Fixed canvas viewport height
+
   // Initialize WebSocket connection and handle URL params
   useEffect(() => {
     //const urlParams = new URLSearchParams(window.location.search);
@@ -80,6 +88,14 @@ const Office = () => {
     };
   }, [token, spaceId]);
 
+  // Function to update camera to follow current user
+  const updateCamera = (userX: number, userY: number) => {
+    const newCameraX = (userX * GRID_SIZE) - (CANVAS_WIDTH / 2);
+    const newCameraY = (userY * GRID_SIZE) - (CANVAS_HEIGHT / 2);
+    
+    setCameraOffset({ x: newCameraX, y: newCameraY });
+  };
+
   const handleWebSocketMessage = (message: any) => {
     switch (message.type) {
       case 'space-joined':
@@ -91,15 +107,22 @@ const Office = () => {
             userId: message.payload.userId
           })
         
+        const newX = Math.floor(Math.random() * breadth);  
+        const newY = Math.floor(Math.random() * length);
         
-        setx(Math.floor(Math.random() * breadth));  
-        sety(Math.floor(Math.random() * length));
+        setx(newX);  
+        sety(newY);
           
-        setCurrentUser({
-          x: x,
-          y: y,
+        const newUser = {
+          x: newX,
+          y: newY,
           userId: message.payload.userId
-        });
+        };
+        
+        setCurrentUser(newUser);
+        
+        // Update camera to focus on the new user
+        updateCamera(newX, newY);
         
         toast({
           title: 'Joined space',
@@ -130,19 +153,31 @@ const Office = () => {
         break;
 
       case 'movement':
-        setUsers(prev => {
-          const newUsers = new Map(prev);
-          const user = newUsers.get(message.payload.userId);
-          if (user) {
-            user.x = message.payload.x;
-            user.y = message.payload.y;
-            newUsers.set(message.payload.userId, user);
-          }
-          toast({
-            title: 'Movement',
-            description: `You are moving to (${message.payload.x}, ${message.payload.y})`,
+        // Check if this is the current user's movement
+        if (message.payload.userId === currentUser.userId) {
+          setCurrentUser(prev => ({
+            ...prev,
+            x: message.payload.x,
+            y: message.payload.y
+          }));
+          // Update camera to follow the current user
+          updateCamera(message.payload.x, message.payload.y);
+        } else {
+          // Update other users
+          setUsers(prev => {
+            const newUsers = new Map(prev);
+            const user = newUsers.get(message.payload.userId);
+            if (user) {
+              user.x = message.payload.x;
+              user.y = message.payload.y;
+              newUsers.set(message.payload.userId, user);
+            }
+            return newUsers;
           });
-          return newUsers;
+        }
+        toast({
+          title: 'Movement',
+          description: `You are moving to (${message.payload.x}, ${message.payload.y})`,
         });
         break;
 
@@ -158,6 +193,8 @@ const Office = () => {
           x: message.payload.x,
           y: message.payload.y
         }));
+        // Update camera for rejected movement too
+        updateCamera(message.payload.x, message.payload.y);
         toast({
           title: 'Movement rejected',
           description: `You cannot move to (${message.payload.x}, ${message.payload.y})`,
@@ -210,7 +247,7 @@ const Office = () => {
     }));
   };
 
-  // Draw the arena
+  // Draw the arena with camera offset
   useEffect(() => {
     console.log("render")
     const canvas = canvasRef.current;
@@ -220,54 +257,79 @@ const Office = () => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid
+    // Save the current context state
+    ctx.save();
+    
+    // Apply camera transformation
+    ctx.translate(-cameraOffset.x, -cameraOffset.y);
+
+    // Draw grid with camera offset
     ctx.strokeStyle = '#eee';
-    for (let i = 0; i < canvas.width; i += 50) {
+    ctx.lineWidth = 1;
+    
+    // Calculate visible grid range
+    const startX = Math.floor(cameraOffset.x / GRID_SIZE) * GRID_SIZE;
+    const endX = startX + CANVAS_WIDTH + GRID_SIZE;
+    const startY = Math.floor(cameraOffset.y / GRID_SIZE) * GRID_SIZE;
+    const endY = startY + CANVAS_HEIGHT + GRID_SIZE;
+    
+    // Draw vertical grid lines
+    for (let i = startX; i <= endX; i += GRID_SIZE) {
       ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
+      ctx.moveTo(i, Math.max(0, startY));
+      ctx.lineTo(i, Math.min(length * GRID_SIZE, endY));
       ctx.stroke();
     }
-    for (let i = 0; i < canvas.height; i += 50) {
+    
+    // Draw horizontal grid lines
+    for (let i = startY; i <= endY; i += GRID_SIZE) {
       ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
+      ctx.moveTo(Math.max(0, startX), i);
+      ctx.lineTo(Math.min(breadth * GRID_SIZE, endX), i);
       ctx.stroke();
     }
+
+    // Draw world boundaries
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, breadth * GRID_SIZE, length * GRID_SIZE);
 
     console.log("before curerntusert")
     console.log(currentUser)
     // Draw current user
-    if (currentUser && currentUser.x) {
+    if (currentUser && currentUser.x !== undefined) {
         console.log("drawing myself")
         console.log(currentUser)
       ctx.beginPath();
       ctx.fillStyle = '#FF6B6B';
-      ctx.arc(currentUser.x * 50, currentUser.y * 50, 20, 0, Math.PI * 2);
+      ctx.arc(currentUser.x * GRID_SIZE, currentUser.y * GRID_SIZE, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('You', currentUser.x * 50, currentUser.y * 50 + 40);
+      ctx.fillText('You', currentUser.x * GRID_SIZE, currentUser.y * GRID_SIZE + 40);
     }
 
     // Draw other users
     users.forEach(user => {
-    if (!user.x) {
+    if (user.x === undefined) {
         return
     }
     console.log("drawing other user")
     console.log(user)
       ctx.beginPath();
       ctx.fillStyle = '#4ECDC4';
-      ctx.arc(user.x * 50, user.y * 50, 20, 0, Math.PI * 2);
+      ctx.arc(user.x * GRID_SIZE, user.y * GRID_SIZE, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`User ${user.userId}`, user.x * 50, user.y * 50 + 40);
+      ctx.fillText(`User ${user.userId}`, user.x * GRID_SIZE, user.y * GRID_SIZE + 40);
     });
-  }, [currentUser, users]);
+    
+    // Restore the context state
+    ctx.restore();
+  }, [currentUser, users, cameraOffset, length, breadth]);
 
   const handleKeyDown = (e: any) => {
     if (!currentUser) return;
@@ -308,8 +370,6 @@ const Office = () => {
     );
   }
 
-
-
   return (
     <div className="p-4" onKeyDown={handleKeyDown} tabIndex={0}>
       <h1 className="text-2xl font-bold mb-4">Arena</h1>
@@ -317,14 +377,15 @@ const Office = () => {
         <p className="text-sm text-gray-600">Token: {token}</p>
         <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
         <p className="text-sm text-gray-600">Connected Users: {users.size + (currentUser ? 1 : 0)}</p>
+        <p className="text-sm text-gray-600">Position: ({currentUser.x}, {currentUser.y})</p>
         <Button onClick={() => setChatOpen(true)}>Open Chat</Button>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
         <canvas
           ref={canvasRef}
-          width={length * 50}
-          height={breadth * 50}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
           className="bg-white"
         />
       </div>
