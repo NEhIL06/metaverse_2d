@@ -218,20 +218,20 @@ const Office = () => {
     console.log("below render")
     
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, breadth, length);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw grid
     ctx.strokeStyle = '#eee';
-    for (let i = 0; i < breadth; i += 50) {
+    for (let i = 0; i < canvas.width; i += 50) {
       ctx.beginPath();
       ctx.moveTo(i, 0);
-      ctx.lineTo(i, length);
+      ctx.lineTo(i, canvas.height);
       ctx.stroke();
     }
-    for (let i = 0; i < length; i += 50) {
+    for (let i = 0; i < canvas.height; i += 50) {
       ctx.beginPath();
       ctx.moveTo(0, i);
-      ctx.lineTo(breadth, i);
+      ctx.lineTo(canvas.width, i);
       ctx.stroke();
     }
 
@@ -243,12 +243,12 @@ const Office = () => {
         console.log(currentUser)
       ctx.beginPath();
       ctx.fillStyle = '#FF6B6B';
-      ctx.arc(currentUser.x, currentUser.y , 20, 0, Math.PI * 2);
+      ctx.arc(currentUser.x * 50, currentUser.y * 50, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('You', currentUser.x , currentUser.y + 40);
+      ctx.fillText('You', currentUser.x * 50, currentUser.y * 50 + 40);
     }
 
     // Draw other users
@@ -260,12 +260,12 @@ const Office = () => {
     console.log(user)
       ctx.beginPath();
       ctx.fillStyle = '#4ECDC4';
-      ctx.arc(user.x , user.y, 20, 0, Math.PI * 2);
+      ctx.arc(user.x * 50, user.y * 50, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`User ${user.userId}`, user.x , user.y + 40);
+      ctx.fillText(`User ${user.userId}`, user.x * 50, user.y * 50 + 40);
     });
   }, [currentUser, users]);
 
