@@ -57,7 +57,7 @@ const Office = () => {
     };
 
     spaceAPI.getById(spaceId)
-  .then(sp => {
+    .then(sp => {
     const [length, breadth] = sp.dimensions.split('x'); // Split "100x200" into ["100", "200"]
     setLength(length); // Set length state
     setBreadth(breadth); // Set breadth state
@@ -91,12 +91,12 @@ const Office = () => {
             userId: message.payload.userId
           })
         
-        setx(message.payload.spawn.x);  
+        setx(message.payload.spawn.x );  
         sety(message.payload.spawn.y);
           
         setCurrentUser({
-          x: message.payload.spawn.x,
-          y: message.payload.spawn.y,
+          x: x,
+          y: y,
           userId: message.payload.userId
         });
         
@@ -330,54 +330,77 @@ const Office = () => {
       <p className="mt-2 text-sm text-gray-500">Use arrow keys to move your avatar</p>
 
       {/* ✅ Floating Chat Window */}
-      {chatOpen && (
-        <div className="fixed bottom-4 right-4 w-80 bg-white shadow-lg rounded-xl flex flex-col border z-50">
-          <div className="flex justify-between items-center p-2 border-b">
-            <h2 className="font-semibold">Group Chat</h2>
-            <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)}>
-              <X size={16} />
-            </Button>
-          </div>
+{chatOpen && (
+  <div className="fixed bottom-4 right-4 w-80 bg-white shadow-xl rounded-xl flex flex-col border border-gray-200 z-50">
+    {/* Header */}
+    <div className="flex justify-between items-center p-2 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
+      <h2 className="font-semibold">Group Chat</h2>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-white hover:bg-white/20"
+        onClick={() => setChatOpen(false)}
+      >
+        <X size={16} />
+      </Button>
+    </div>
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-64">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`p-2 rounded-lg ${
-                  msg.userId === currentUser.userId ? 'bg-blue-100 text-right' : 'bg-gray-100 text-left'
-                }`}
-              >
-                <p className="text-xs text-gray-500">
-                  {msg.userId === currentUser.userId ? 'You' : `User ${msg.userId}`}
-                </p>
-                <p className="text-sm">{msg.message}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center p-2 border-t gap-2">
-            <Input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Type a message..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSendMessage(chatInput);
-                  setChatInput('');
-                }
-              }}
-            />
-            <Button
-              onClick={() => {
-                handleSendMessage(chatInput);
-                setChatInput('');
-              }}
-            >
-              Send
-            </Button>
-          </div>
-        </div>
+    {/* Messages */}
+    <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-64 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+      {messages.length === 0 && (
+        <p className="text-center text-gray-400 text-sm">No messages yet</p>
       )}
+      {messages.map((msg, idx) => {
+        const isMe = msg.userId === currentUser.userId;
+        return (
+          <div
+            key={idx}
+            className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
+                isMe
+                  ? 'bg-blue-600 text-white rounded-br-none'
+                  : 'bg-gray-100 text-gray-800 rounded-bl-none'
+              }`}
+            >
+              <p className="text-xs font-semibold opacity-80 mb-0.5">
+                {isMe ? 'You' : `User ${msg.userId}`}
+              </p>
+              <p className="text-sm leading-snug">{msg.message}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Input */}
+    <div className="flex items-center p-2 border-t bg-gray-50 gap-2">
+      <Input
+        value={chatInput}
+        onChange={(e) => setChatInput(e.target.value)}
+        placeholder="Type a message..."
+        className="flex-1 border-gray-300"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            handleSendMessage(chatInput);
+            setChatInput('');
+          }
+        }}
+      />
+      <Button
+        onClick={() => {
+          handleSendMessage(chatInput);
+          setChatInput('');
+        }}
+        className="bg-blue-600 hover:bg-blue-700 text-white"
+      >
+        Send
+      </Button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
