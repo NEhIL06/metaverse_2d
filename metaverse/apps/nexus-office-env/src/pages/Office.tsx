@@ -483,165 +483,109 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
     );
   }
 
-
+// ctrl + y karne mei mil jayega complete code for the Updated components
+/**
+ * 
+ * Push the chanegs to the repo
+ * 
+ * schema update kar
+ * locally check if the page loads or not
+ * then push the changes to prod
+ */
 
   return (
     <div className="p-4" onKeyDown={handleKeyDown} tabIndex={0}>
-    <h1 className="text-2xl font-bold mb-4">Arena</h1>
-    <div className="mb-4">
-      <p className="text-sm text-gray-600">Token: {token}</p>
-      <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
-      <p className="text-sm text-gray-600">
-        Connected Users: {users.size + (currentUser ? 1 : 0)}
-      </p>
-      <div className="flex gap-2">
+      <h1 className="text-2xl font-bold mb-4">Arena</h1>
+      <div className="mb-4">
+        <p className="text-sm text-gray-600">Token: {token}</p>
+        <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
+        <p className="text-sm text-gray-600">Connected Users: {users.size + (currentUser ? 1 : 0)}</p>
         <Button onClick={() => setChatOpen(true)}>Open Chat</Button>
-        {inCallWith && (
-          <Button
-            variant="destructive"
-            onClick={endCall}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            End Call
-          </Button>
-        )}
       </div>
-    </div>
 
-    <div className="border rounded-lg overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        width={length * 50}
-        height={breadth * 50}
-        className="bg-white"
-      />
-    </div>
-    <p className="mt-2 text-sm text-gray-500">Use arrow keys to move your avatar</p>
+      <div className="border rounded-lg overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          width={length * 50}
+          height={breadth * 50}
+          className="bg-white"
+        />
+      </div>
+      <p className="mt-2 text-sm text-gray-500">Use arrow keys to move your avatar</p>
 
-    {/* ✅ Floating Chat Window */}
-    {chatOpen && (
-      <div className="fixed bottom-4 right-4 w-80 bg-white shadow-xl rounded-xl flex flex-col border border-gray-200 z-50">
-        {/* Header */}
-        <div className="flex justify-between items-center p-2 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
-          <h2 className="font-semibold">Group Chat</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:bg-white/20"
-            onClick={() => setChatOpen(false)}
-          >
-            <X size={16} />
-          </Button>
-        </div>
+      {/* ✅ Floating Chat Window */}
+      {chatOpen && (
+        <div className="fixed bottom-4 right-4 w-80 bg-white shadow-xl rounded-xl flex flex-col border border-gray-200 z-50">
+          {/* Header */}
+          <div className="flex justify-between items-center p-2 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
+            <h2 className="font-semibold">Group Chat</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20"
+              onClick={() => setChatOpen(false)}
+            >
+              <X size={16} />
+            </Button>
+          </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-64 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-          {messages.length === 0 && (
-            <p className="text-center text-gray-400 text-sm">No messages yet</p>
-          )}
-          {messages.map((msg, idx) => {
-            const isMe = msg.userId === currentUser.userId;
-            return (
-              <div
-                key={idx}
-                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-              >
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-64 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+            {messages.length === 0 && (
+              <p className="text-center text-gray-400 text-sm">No messages yet</p>
+            )}
+            {messages.map((msg, idx) => {
+              const isMe = msg.userId === currentUser.userId;
+              return (
                 <div
-                  className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
-                    isMe
-                      ? "bg-blue-600 text-white rounded-br-none"
-                      : "bg-gray-100 text-gray-800 rounded-bl-none"
-                  }`}
+                  key={idx}
+                  className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                 >
-                  <p className="text-xs font-semibold opacity-80 mb-0.5">
-                    {isMe ? "You" : `User ${msg.userId}`}
-                  </p>
-                  <p className="text-sm leading-snug">{msg.message}</p>
+                  <div
+                    className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
+                      isMe
+                        ? 'bg-blue-600 text-white rounded-br-none'
+                        : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                    }`}
+                  >
+                    <p className="text-xs font-semibold opacity-80 mb-0.5">
+                      {isMe ? 'You' : `User ${msg.userId}`}
+                    </p>
+                    <p className="text-sm leading-snug">{msg.message}</p>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Input */}
-        <div className="flex items-center p-2 border-t bg-gray-50 gap-2">
-          <Input
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 border-gray-300"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
+          {/* Input */}
+          <div className="flex items-center p-2 border-t bg-gray-50 gap-2">
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 border-gray-300"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSendMessage(chatInput);
+                  setChatInput('');
+                }
+              }}
+            />
+            <Button
+              onClick={() => {
                 handleSendMessage(chatInput);
-                setChatInput("");
-              }
-            }}
-          />
-          <Button
-            onClick={() => {
-              handleSendMessage(chatInput);
-              setChatInput("");
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Send
-          </Button>
-        </div>
-      </div>
-    )}
-
-    {/* ✅ Floating Video Call Window */}
-    {inCallWith && (
-      <div className="fixed bottom-4 left-4 w-96 bg-white shadow-xl rounded-xl border border-gray-200 z-50 overflow-hidden">
-        {/* Header */}
-        <div className="flex justify-between items-center p-2 border-b bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-t-xl">
-          <h2 className="font-semibold">Video Call with {inCallWith}</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:bg-white/20"
-            onClick={endCall}
-          >
-            <X size={16} />
-          </Button>
-        </div>
-
-        {/* Video Streams */}
-        <div className="relative bg-black h-64">
-          {remoteStream ? (
-            <video
-              autoPlay
-              playsInline
-              ref={(video) => {
-                if (video && remoteStream) {
-                  video.srcObject = remoteStream;
-                }
+                setChatInput('');
               }}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <p className="text-center text-gray-400 mt-24">Waiting for remote video...</p>
-          )}
-
-          {/* Local video in corner */}
-          {localStream && (
-            <video
-              autoPlay
-              muted
-              playsInline
-              ref={(video) => {
-                if (video && localStream) {
-                  video.srcObject = localStream;
-                }
-              }}
-              className="absolute bottom-2 right-2 w-28 h-20 rounded-md border-2 border-white object-cover shadow-lg"
-            />
-          )}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Send
+            </Button>
+          </div>
         </div>
-      </div>
-    )}
-  </div>
+      )}
 
+    </div>
   );
 };
 
