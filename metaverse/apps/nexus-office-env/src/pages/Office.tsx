@@ -114,18 +114,22 @@ const Office = () => {
   // When users or currentUser changes, check proximity and initiate deterministic calls
   useEffect(() => {
     if (!currentUser || !currentUser.userId) return;
-    users.forEach((user, id) => {
-      if (inCallWith === id) return;
+
+    users.forEach((user) => {
+      if (inCallWith === user.userId) return;
       // skip self if server included current user in users list
-      if (String(id) === String(currentUser.userId)) return;
+      if (String(user.userId) === String(currentUser.userId)) return;
       const dist = distanceBetween(currentUser as any, user as any);
       if (dist <= proximityThreshold) {
         const myId = String(currentUser.userId);
-        const otherId = String(id);
+        const otherId = String(user.userId);
+        console.log(`Users ${myId} and ${otherId} are within proximity`);
         const initiator = myId < otherId ? myId : otherId;
         if (myId === initiator) {
           startCall(otherId);
         }
+
+
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,7 +241,8 @@ const Office = () => {
       }
 
       case 'incomming:call': {
-        // server forwards the offer to callee
+        // server forwards the offer to called
+        console.log('Incoming call from', message.payload.from);
         const { from, offer } = message.payload;
         const accept = window.confirm(`Incoming call from ${from}. Accept?`);
         if (!accept) {
@@ -378,7 +383,7 @@ const Office = () => {
     try {
       await acquireLocalMedia();
       PeerService.reset();
-
+      console.log('Starting call to', otherId);
       PeerService.onIce((candidate: any) => {
         wsRef.current?.send(
           JSON.stringify({
@@ -387,6 +392,7 @@ const Office = () => {
           })
         );
       });
+      console.log(`otherId is ${otherId} and this userId is ${currentUser?.userId}`);
 
       PeerService.onTrack((stream: MediaStream) => {
         setRemoteStream(stream);
@@ -399,7 +405,7 @@ const Office = () => {
           payload: { to: otherId, offer },
         })
       );
-
+      console.log('Offer sent to', otherId);
       pendingCallRef.current = { to: otherId };
     } catch (e) {
       console.error('startCall failed', e);

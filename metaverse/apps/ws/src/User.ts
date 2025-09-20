@@ -153,6 +153,7 @@ export class User {
                             offer
                         }
                     }, to, this.spaceId!);
+                    console.log("incomming:call sent");
                     break;
 
                 case "call:accepted":
@@ -166,6 +167,7 @@ export class User {
                             ans
                         }
                     }, acceptedTo, this.spaceId!);
+                    console.log("call:accepted sent");
                     break;
 
                 case "peer:nego:needed":
