@@ -1,9 +1,10 @@
 // PeerService.js
 class PeerService {
   constructor() {
+    this._makePeer();
     this.onTrackCallback = null;
     this.onIceCallback = null;
-    this._makePeer();
+    this.pendingCandidates = [];
   }
 
   _makePeer() {
@@ -54,6 +55,16 @@ class PeerService {
   async setRemoteAnswer(ans) {
     if (!this.peer) this._makePeer();
     await this.peer.setRemoteDescription(ans);
+
+    // ✅ flush buffered ICE candidates
+    while (this.pendingCandidates.length) {
+      const c = this.pendingCandidates.shift();
+      try {
+        await this.peer.addIceCandidate(c);
+      } catch (e) {
+        console.warn("Failed to flush ICE candidate", e);
+      }
+    }
   }
 
   // Add local tracks BEFORE calling getOffer() or getAnswer()
@@ -64,6 +75,11 @@ class PeerService {
 
   async addIceCandidate(candidate) {
     if (!this.peer) return;
+    if (!this.peer.remoteDescription) {
+      // ✅ buffer until remote description is set
+      this.pendingCandidates.push(candidate);
+      return;
+    }
     try {
       await this.peer.addIceCandidate(candidate);
     } catch (e) {

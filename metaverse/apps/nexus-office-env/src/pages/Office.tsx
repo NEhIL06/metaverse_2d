@@ -241,17 +241,23 @@ const Office = () => {
       }
 
       case 'incomming:call': {
+        // server forwards the offer to called
         console.log('Incoming call from', message.payload.from);
         const { from, offer } = message.payload;
         const accept = window.confirm(`Incoming call from ${from}. Accept?`);
-        if (!accept) return;
-      
+        if (!accept) {
+          // could send a rejection message to server here if implemented
+          return;
+        }
+
         (async () => {
           try {
-            const stream = await acquireLocalMedia();   // ✅ use returned stream
+            await acquireLocalMedia();
             PeerService.reset();
-            PeerService.addLocalStream(stream);
-      
+            // ensure PeerService has the stream
+            if (localStream) {
+              PeerService.addLocalStream(localStream);
+            }
             PeerService.onIce((candidate: any) => {
               wsRef.current?.send(
                 JSON.stringify({
@@ -261,7 +267,8 @@ const Office = () => {
               );
             });
             PeerService.onTrack((stream: MediaStream) => setRemoteStream(stream));
-      
+
+            // getAnswer will set remote description, create answer and set local desc
             const ans = await PeerService.getAnswer(offer);
             wsRef.current?.send(
               JSON.stringify({
@@ -276,13 +283,14 @@ const Office = () => {
         })();
         break;
       }
-      
 
       case 'call:accepted': {
+        // initiator receives answer
         const { from, ans } = message.payload;
         (async () => {
           try {
-            await PeerService.setRemoteAnswer(ans);   // ✅ new name
+            // assume this sets remote description for the initiator
+            await PeerService.setLocalDescription(ans);
             setInCallWith(from);
           } catch (err) {
             console.error('error setting remote desc', err);
@@ -290,7 +298,6 @@ const Office = () => {
         })();
         break;
       }
-      
 
       case 'ice:candidate': {
         const { candidate } = message.payload;
@@ -374,10 +381,9 @@ const Office = () => {
 
   const startCall = async (otherId: string) => {
     try {
-      const stream = await acquireLocalMedia();   // ✅ use returned stream
+      await acquireLocalMedia();
       PeerService.reset();
-      PeerService.addLocalStream(stream);
-  
+      console.log('Starting call to', otherId);
       PeerService.onIce((candidate: any) => {
         wsRef.current?.send(
           JSON.stringify({
@@ -386,11 +392,12 @@ const Office = () => {
           })
         );
       });
-  
+      console.log(`otherId is ${otherId} and this userId is ${currentUser?.userId}`);
+
       PeerService.onTrack((stream: MediaStream) => {
         setRemoteStream(stream);
       });
-  
+
       const offer = await PeerService.getOffer();
       wsRef.current?.send(
         JSON.stringify({
@@ -404,7 +411,6 @@ const Office = () => {
       console.error('startCall failed', e);
     }
   };
-  
 
   const endCall = () => {
     PeerService.reset();

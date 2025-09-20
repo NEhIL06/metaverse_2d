@@ -76,6 +76,21 @@ export class User {
                             users: RoomManager.getInstance().rooms.get(spaceId)?.filter(x => x.id !== this.id)?.map((u) => ({id: u.userId, x: u.x,y: u.y})) ?? []// users ka id jo us room mei hai
                         }
                     });
+                    this.send({
+                        type: "space-joined",
+                        payload: {
+                          spawn: { x: this.x, y: this.y },
+                          userId: this.userId,   // ✅ use userId
+                          users: RoomManager.getInstance().rooms.get(spaceId)
+                            ?.filter(x => x.id !== this.id)
+                            ?.map(u => ({
+                              userId: u.userId,   // ✅ not u.id
+                              x: u.x,
+                              y: u.y
+                            })) ?? []
+                        }
+                      });
+                      
                     console.log("jouin receiverdf5")
                     RoomManager.getInstance().broadcast({
                         type: "user-joined",
