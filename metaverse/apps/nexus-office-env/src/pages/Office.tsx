@@ -7,7 +7,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { spaceAPI } from '@/lib/api';
 import { Input } from '@/components/ui/input';
-import { PeerService } from './service/peer';
+import PeerService from './service/peer';
 
 type UserMap = Map<string, { x: number; y: number; userId: string }>;
 
