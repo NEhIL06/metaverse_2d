@@ -40,7 +40,7 @@ export class User {
             switch (parsedData.type) {
                 case "join":
                     console.log("jouin receiverdfd")
-                    // we will first check weather the uesr is verified or not
+                    // we will first check weather the user is verified or not
                     const spaceId = parsedData.payload.spaceId;
                     const token = parsedData.payload.token;
                     const userId = (jwt.verify(token, JWT_PASSWORD) as JwtPayload).userId
@@ -158,13 +158,13 @@ export class User {
                       
 
                 case "call:accepted":
-                    console.log("Call accepted from", this.id, "to", parsedData.payload.to);
+                    console.log("Call accepted from", this.userId, "to", parsedData.payload.to);
                     const acceptedTo = parsedData.payload.to;
                     const ans = parsedData.payload.ans;
                     RoomManager.getInstance().sendOffer({
                         type: "call:accepted",
                         payload: {
-                            from: this.id,
+                            from: this.userId,
                             ans
                         }
                     }, acceptedTo, this.spaceId!);
@@ -178,7 +178,7 @@ export class User {
                     RoomManager.getInstance().sendOffer({
                         type: "peer:nego:needed",
                         payload: {
-                            from: this.id,
+                            from: this.userId,
                             offer: negoOffer
                         }
                     }, negoTo, this.spaceId!);
@@ -191,20 +191,20 @@ export class User {
                     RoomManager.getInstance().sendOffer({
                         type: "peer:nego:final",
                         payload: {
-                            from: this.id,
+                            from: this.userId,
                             ans: negoDoneAns
                         }
                     }, negoDoneTo, this.spaceId!);
                     break;
 
                 case "ice:candidate":
-                    console.log("ICE candidate from", this.id, "to", parsedData.payload.to);
+                    console.log("ICE candidate from", this.userId, "to", parsedData.payload.to);
                     const iceTo = parsedData.payload.to;
                     const candidate = parsedData.payload.candidate;
                     RoomManager.getInstance().sendOffer({
                         type: "ice:candidate",
                         payload: {
-                            from: this.id,
+                            from: this.userId,
                             candidate
                         }
                     }, iceTo, this.spaceId!);
