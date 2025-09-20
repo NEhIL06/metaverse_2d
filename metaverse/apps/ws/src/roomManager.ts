@@ -20,7 +20,7 @@ export class RoomManager {
         if (!this.rooms.has(spaceId)) {
             return;
         }
-        this.rooms.set(spaceId, (this.rooms.get(spaceId)?.filter((u) => u.id !== user.id) ?? []));
+        this.rooms.set(spaceId, (this.rooms.get(spaceId)?.filter((u) => u.userId !== user.userId) ?? []));
     }
 
     public addUser(spaceId: string, user: User) {
@@ -36,7 +36,7 @@ export class RoomManager {
             return;
         }
         this.rooms.get(roomId)?.forEach((u) => {
-            if (u.id !== user.id) {
+            if (u.userId !== user.userId) {
                 u.send(message);
             }
         });
@@ -59,7 +59,7 @@ export class RoomManager {
         // Find the target user
         let targetUser: User | undefined;
         for (const user of room) {
-          if (user.id === userId) {
+          if (user.userId === userId) {
             targetUser = user;
             break;
           }
@@ -90,7 +90,7 @@ export class RoomManager {
             return;
         }
         this.rooms.get(spaceId)?.forEach((u) => {
-            if (u.id === userId) {
+            if (u.userId === userId) {
                 u.send(message);
             }
         });
