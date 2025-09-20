@@ -584,6 +584,30 @@ const Office = () => {
             {inCallWith ? 'End Call' : 'Call Someone'}
           </Button>
         </div>
+        <div className="flex gap-4 mt-4">
+  {localStream && (
+    <video
+      autoPlay
+      muted
+      playsInline
+      ref={video => {
+        if (video && localStream) video.srcObject = localStream;
+      }}
+      className="w-48 h-36 bg-black rounded"
+    />
+  )}
+  {remoteStream && (
+    <video
+      autoPlay
+      playsInline
+      ref={video => {
+        if (video && remoteStream) video.srcObject = remoteStream;
+      }}
+      className="w-48 h-36 bg-black rounded"
+    />
+  )}
+</div>
+
       </div>
 
       <div className="border rounded-lg overflow-hidden">
