@@ -290,7 +290,7 @@ const Office = () => {
         (async () => {
           try {
             // assume this sets remote description for the initiator
-            await PeerService.setLocalDescription(ans);
+            await PeerService.setRemoteAnswer(ans);
             setInCallWith(from);
           } catch (err) {
             console.error('error setting remote desc', err);
@@ -335,7 +335,7 @@ const Office = () => {
         const { ans } = message.payload;
         (async () => {
           try {
-            await PeerService.setLocalDescription(ans);
+            await PeerService.setRemoteAnswer(ans);
           } catch (err) {
             console.error('peer nego final failed', err);
           }
@@ -381,8 +381,11 @@ const Office = () => {
 
   const startCall = async (otherId: string) => {
     try {
-      await acquireLocalMedia();
       PeerService.reset();
+      const stream = await acquireLocalMedia();
+      if (stream) {
+        PeerService.addLocalStream(stream);
+      }
       console.log('Starting call to', otherId);
       PeerService.onIce((candidate: any) => {
         wsRef.current?.send(
@@ -395,6 +398,7 @@ const Office = () => {
       console.log(`otherId is ${otherId} and this userId is ${currentUser?.userId}`);
 
       PeerService.onTrack((stream: MediaStream) => {
+        console.log("✅ Remote track received", stream);
         setRemoteStream(stream);
       });
 
@@ -603,15 +607,15 @@ const Office = () => {
     />
   )}
   {remoteStream && (
-    <video
-      autoPlay
-      playsInline
-      ref={video => {
-        if (video && remoteStream) video.srcObject = remoteStream;
-      }}
-      className="w-48 h-36 bg-black rounded"
-    />
-  )}
+  <video
+    autoPlay
+    playsInline
+    ref={video => {
+      if (video && remoteStream) video.srcObject = remoteStream;
+    }}
+    className="w-48 h-36 bg-black rounded"
+  />
+)}
 </div>
 
       </div>

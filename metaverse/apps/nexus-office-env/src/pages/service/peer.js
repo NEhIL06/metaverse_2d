@@ -16,10 +16,9 @@ class PeerService {
 
     // attach listeners
     this.peer.ontrack = (ev) => {
-      const remoteStream = ev.streams?.[0] || new MediaStream();
-      if (this.onTrackCallback) {
-        this.onTrackCallback(remoteStream);
-      }
+      console.log("📥 ontrack fired", ev.streams);
+      const remoteStream = ev.streams && ev.streams[0] ? ev.streams[0] : new MediaStream();
+      if (this.onTrackCallback) this.onTrackCallback(remoteStream);
     };
 
     this.peer.onicecandidate = (ev) => {
@@ -72,6 +71,7 @@ class PeerService {
     if (!this.peer) this._makePeer();
     stream.getTracks().forEach((t) => this.peer.addTrack(t, stream));
   }
+  
 
   async addIceCandidate(candidate) {
     if (!this.peer) return;
