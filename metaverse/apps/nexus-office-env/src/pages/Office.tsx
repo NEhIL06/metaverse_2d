@@ -1,98 +1,135 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import { spaceAPI } from '@/lib/api';
-import Dashboard from './Dashboard';
-import { GroupChat } from '@/components/chat/GroupChat';
-import { set } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { PeerService } from './service/peer';
 
+type UserMap = Map<string, { x: number; y: number; userId: string }>;
+
 const Office = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
-const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-const [inCallWith, setInCallWith] = useState<string | null>(null); // user id we are in call with
-const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [inCallWith, setInCallWith] = useState<string | null>(null); // user id we are in call with
+  const pendingCallRef = useRef<{ to?: string; from?: string } | null>(null);
 
-  const proximityThreshold = 3; // distance threshold to trigger call
+  const proximityThreshold = 3; // distance threshold to trigger call (grid units)
 
-  function distanceBetween(userA: any, userB: any) {
+  function distanceBetween(userA: { x: number; y: number }, userB: { x: number; y: number }) {
     const dx = userA.x - userB.x;
     const dy = userA.y - userB.y;
     return Math.sqrt(dx * dx + dy * dy);
   }
   const { toast } = useToast();
-  const canvasRef = useRef<any>(null);
-  const wsRef = useRef<any>(null);
-  const [currentUser, setCurrentUser] = useState<any>({});
-  const [users, setUsers] = useState(new Map());
-  const [length, setLength] = useState<any>('');
-  const [breadth, setBreadth] = useState<any>('');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ x: number; y: number; userId?: string } | null>(
+    null
+  );
+  const [users, setUsers] = useState<UserMap>(new Map());
   const [messages, setMessages] = useState<any[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
-  const [x, setx] = useState(0);
-  const [y, sety] = useState(0);
+  const [arenaWidth, setArenaWidth] = useState<number>(10); // default grid width (units)
+  const [arenaHeight, setArenaHeight] = useState<number>(8); // default grid height (units)
   const navigate = useNavigate();
 
   const token = localStorage.getItem('token') || '';
 
   const webSocketUrl = import.meta.env.VITE_WS_URL;
-  // Initialize WebSocket connection and handle URL params
-  useEffect(() => {
-    //const urlParams = new URLSearchParams(window.location.search);
-    //const token = urlParams.get('token') || '';
-    //const spaceId = urlParams.get('spaceId') || '';
-    //setParams({ token, spaceId });
 
-    // Initialize WebSocket
-    if(!webSocketUrl) {
-      console.log("No webSocketUrl")
-      return
+  // initialize websocket + fetch space dims
+  useEffect(() => {
+    if (!webSocketUrl || !spaceId) {
+      console.warn('Missing WS URL or spaceId');
+      return;
     }
-    wsRef.current = new WebSocket(webSocketUrl); // Replace with your WS_URL
-    
-    wsRef.current.onopen = () => {
-      // Join the space once connected
-      wsRef.current.send(JSON.stringify({
-        type: 'join',
-        payload: {
-          spaceId,
-          token
+
+    // fetch space dimensions first
+    spaceAPI
+      .getById(spaceId)
+      .then((sp: any) => {
+        if (sp && sp.dimensions) {
+          // expect "W x H" as "100x200"
+          const parts = String(sp.dimensions).split('x').map(s => s.trim());
+          const w = Number(parts[0]) || arenaWidth;
+          const h = Number(parts[1]) || arenaHeight;
+          setArenaWidth(w);
+          setArenaHeight(h);
+          console.log('Space dims', w, h);
         }
-      }));
+      })
+      .catch(error => {
+        console.error('Error fetching space:', error);
+      });
+
+    const ws = new WebSocket(webSocketUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(
+        JSON.stringify({
+          type: 'join',
+          payload: {
+            spaceId,
+            token,
+          },
+        })
+      );
     };
 
-    spaceAPI.getById(spaceId)
-    .then(sp => {
-    const [length, breadth] = sp.dimensions.split('x'); // Split "100x200" into ["100", "200"]
-    setLength(length); // Set length state
-    setBreadth(breadth); // Set breadth state
-    console.log("Length:", length, "Breadth:", breadth);
-  })
-  .catch(error => {
-    console.error("Error fetching space:", error);
-  });
-    
+    ws.onmessage = (ev: MessageEvent<any>) => {
+      try {
+        const message = JSON.parse(ev.data);
+        handleWebSocketMessage(message);
+      } catch (err) {
+        console.error('invalid ws message', err);
+      }
+    };
 
-    wsRef.current.onmessage = (event: any) => {
-      const message = JSON.parse(event.data);
-      handleWebSocketMessage(message);
+    ws.onclose = () => {
+      console.log('websocket closed');
+    };
+
+    ws.onerror = e => {
+      console.error('ws error', e);
     };
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
+      try {
+        ws.close();
+      } catch (e) {
+        /* ignore */
       }
+      wsRef.current = null;
     };
-  }, [token, spaceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId, webSocketUrl]);
 
+  // When users or currentUser changes, check proximity and initiate deterministic calls
+  useEffect(() => {
+    if (!currentUser || !currentUser.userId) return;
+    users.forEach((user, id) => {
+      if (inCallWith === id) return;
+      // skip self if server included current user in users list
+      if (String(id) === String(currentUser.userId)) return;
+      const dist = distanceBetween(currentUser as any, user as any);
+      if (dist <= proximityThreshold) {
+        const myId = String(currentUser.userId);
+        const otherId = String(id);
+        const initiator = myId < otherId ? myId : otherId;
+        if (myId === initiator) {
+          startCall(otherId);
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, currentUser, inCallWith]);
 
   const acquireLocalMedia = async () => {
     if (localStream) return localStream;
@@ -100,185 +137,228 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
       const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
       setLocalStream(s);
       // attach tracks to PeerService so getOffer() will include them to the PeerConnection
-      PeerService.addLocalStream(s);
+      try {
+        PeerService.addLocalStream(s);
+      } catch (e) {
+        // PeerService may expect stream to be added later — ok to ignore failure here
+        console.warn('PeerService.addLocalStream failed', e);
+      }
       return s;
     } catch (e) {
-      toast({ title: "Media error", description: "Camera/Mic permission required." });
+      toast({ title: 'Media error', description: 'Camera/Mic permission required.' });
       throw e;
     }
   };
-  
 
   const handleWebSocketMessage = (message: any) => {
+    if (!message || !message.type) return;
     switch (message.type) {
-      case 'space-joined':
-        // Initialize current user position and other users
-        { console.log("set")
-        console.log({
-            x: message.payload.spawn.x,
-            y: message.payload.spawn.y,
-            userId: message.payload.userId
-          })
-        
-        
-        setx(Math.floor(Math.random() * breadth));  
-        sety(Math.floor(Math.random() * length));
-          
-        setCurrentUser({
-          x: x,
-          y: y,
-          userId: message.payload.userId
-        });
-        
-        toast({
-          title: 'Joined space',
-          description: `You have joined space ${message.payload.spaceId}`,
-        });
-        // Initialize other users from the payload
-        const userMap = new Map();
-        message.payload.users.forEach((user: any) => {
-          userMap.set(user.userId, user);
-        });
-        setUsers(userMap);
-        break; }
+      case 'space-joined': {
+        // server sends spawn coords and list of users
+        try {
+          const spawnX = Number(message.payload?.spawn?.x ?? Math.floor(Math.random() * arenaWidth));
+          const spawnY = Number(message.payload?.spawn?.y ?? Math.floor(Math.random() * arenaHeight));
+          const userId = message.payload?.userId;
+          setCurrentUser({
+            x: spawnX,
+            y: spawnY,
+            userId,
+          });
+          toast({
+            title: 'Joined space',
+            description: `You have joined space ${message.payload.spaceId}`,
+          });
 
-      case 'user-joined':
+          const userMap: UserMap = new Map();
+          (message.payload?.users ?? []).forEach((u: any) => {
+            if (!u || !u.userId) return;
+            // don't include ourself in the 'other users' list
+            if (String(u.userId) === String(userId)) return;
+            userMap.set(String(u.userId), {
+              x: Number(u.x) || 0,
+              y: Number(u.y) || 0,
+              userId: String(u.userId),
+            });
+          });
+          setUsers(userMap);
+        } catch (e) {
+          console.error('space-joined handling error', e);
+        }
+        break;
+      }
+
+      case 'user-joined': {
+        const payload = message.payload;
         setUsers(prev => {
           const newUsers = new Map(prev);
-          newUsers.set(message.payload.userId, {
-            x: message.payload.x,
-            y: message.payload.y,
-            userId: message.payload.userId
+          newUsers.set(String(payload.userId), {
+            x: Number(payload.x) || 0,
+            y: Number(payload.y) || 0,
+            userId: String(payload.userId),
           });
           toast({
             title: 'User joined',
-            description: `User ${message.payload.userId} has joined the space`,
+            description: `User ${payload.userId} has joined the space`,
           });
           return newUsers;
         });
         break;
+      }
 
-      case 'movement':
-        setUsers(prev => {
-          const newUsers = new Map(prev);
-          const user = newUsers.get(message.payload.userId);
-          if (user) {
-            user.x = message.payload.x;
-            user.y = message.payload.y;
-            newUsers.set(message.payload.userId, user);
-          }
-          toast({
-            title: 'Movement',
-            description: `You are moving to (${message.payload.x}, ${message.payload.y})`,
+      case 'movement': {
+        const p = message.payload;
+        // if movement belongs to current user, update currentUser coords
+        if (currentUser && String(p.userId) === String(currentUser.userId)) {
+          setCurrentUser(prev => (prev ? { ...prev, x: Number(p.x) || prev.x, y: Number(p.y) || prev.y } : prev));
+        } else {
+          setUsers(prev => {
+            const newUsers = new Map(prev);
+            const u = newUsers.get(String(p.userId));
+            if (u) {
+              u.x = Number(p.x) || u.x;
+              u.y = Number(p.y) || u.y;
+              newUsers.set(String(p.userId), u);
+            } else {
+              newUsers.set(String(p.userId), {
+                x: Number(p.x) || 0,
+                y: Number(p.y) || 0,
+                userId: String(p.userId),
+              });
+            }
+            return newUsers;
           });
-          return newUsers;
-        });
+        }
         break;
+      }
 
-      case 'groupChat':
-        setMessages(prev => [...prev, message.payload]);      
+      case 'groupChat': {
+        setMessages(prev => [...prev, message.payload]);
         break;
+      }
 
-        case 'incomming:call': { // server forwards the offer to callee
-          const { from, offer } = message.payload;
-          // prompt user to accept - replace with nicer UI if you want
-          const accept = window.confirm(`Incoming call from ${from}. Accept?`);
-          if (!accept) {
-            // simply ignore or send rejection if you implement it
-            return;
-          }
-      
-          // accept: prepare PeerService and local tracks, create answer and send back
-          (async () => {
+      case 'incomming:call': {
+        // server forwards the offer to callee
+        const { from, offer } = message.payload;
+        const accept = window.confirm(`Incoming call from ${from}. Accept?`);
+        if (!accept) {
+          // could send a rejection message to server here if implemented
+          return;
+        }
+
+        (async () => {
+          try {
             await acquireLocalMedia();
             PeerService.reset();
-            PeerService.addLocalStream(localStream!);
-            PeerService.onIce((candidate) => {
-              wsRef.current?.send(JSON.stringify({
-                type: 'ice:candidate',
-                payload: { to: from, candidate }
-              }));
-            });
-            PeerService.onTrack((stream) => setRemoteStream(stream));
-      
-            // getAnswer will set remote description, create answer and set local desc (per your PeerService)
-            const ans = await PeerService.getAnswer(offer);
-            // send answer to initiator via server
-            wsRef.current?.send(JSON.stringify({
-              type: 'call:accepted',
-              payload: { to: from, ans }
-            }));
-            setInCallWith(from);
-          })();
-          break;
-        }
-      
-        case 'call:accepted': {
-          // initiator receives answer
-          const { from, ans } = message.payload;
-          // set remote desc so connection finishes
-          (async () => {
-            await PeerService.setLocalDescription(ans); // your method sets remote desc for initiator
-            setInCallWith(from);
-          })();
-          break;
-        }
-      
-        case 'ice:candidate': {
-          const { from, candidate } = message.payload;
-          // add candidate to peer
-          (async () => {
-            if (candidate) {
-              await PeerService.addIceCandidate(candidate);
+            // ensure PeerService has the stream
+            if (localStream) {
+              PeerService.addLocalStream(localStream);
             }
-          })();
-          break;
-        }
-      
-        // optional: peer negotiation events (peer:nego:needed / peer:nego:final)
-        case 'peer:nego:needed': {
-          // remote wants to renegotiate (e.g., device change)
-          const { from, offer } = message.payload;
-          (async () => {
-            // create answer for the renegotiation offer
-            const ans = await PeerService.getAnswer(offer);
-            wsRef.current?.send(JSON.stringify({
-              type: 'peer:nego:done',
-              payload: { to: from, ans }
-            }));
-          })();
-          break;
-        }
-      
-        case 'peer:nego:final': {
-          // final answer for renegotiation
-          const { from, ans } = message.payload;
-          (async () => {
-            await PeerService.setLocalDescription(ans);
-          })();
-          break;
-        }
-      
-         
-      
+            PeerService.onIce((candidate: any) => {
+              wsRef.current?.send(
+                JSON.stringify({
+                  type: 'ice:candidate',
+                  payload: { to: from, candidate },
+                })
+              );
+            });
+            PeerService.onTrack((stream: MediaStream) => setRemoteStream(stream));
 
-      case 'movement-rejected':
-        // Reset current user position if movement was rejected
-        setCurrentUser((prev: any) => ({
-          ...prev,
-          x: message.payload.x,
-          y: message.payload.y
-        }));
+            // getAnswer will set remote description, create answer and set local desc
+            const ans = await PeerService.getAnswer(offer);
+            wsRef.current?.send(
+              JSON.stringify({
+                type: 'call:accepted',
+                payload: { to: from, ans },
+              })
+            );
+            setInCallWith(from);
+          } catch (err) {
+            console.error('error accepting call', err);
+          }
+        })();
+        break;
+      }
+
+      case 'call:accepted': {
+        // initiator receives answer
+        const { from, ans } = message.payload;
+        (async () => {
+          try {
+            // assume this sets remote description for the initiator
+            await PeerService.setLocalDescription(ans);
+            setInCallWith(from);
+          } catch (err) {
+            console.error('error setting remote desc', err);
+          }
+        })();
+        break;
+      }
+
+      case 'ice:candidate': {
+        const { candidate } = message.payload;
+        (async () => {
+          if (candidate) {
+            try {
+              await PeerService.addIceCandidate(candidate);
+            } catch (err) {
+              console.warn('addIceCandidate failed', err);
+            }
+          }
+        })();
+        break;
+      }
+
+      case 'peer:nego:needed': {
+        const { from, offer } = message.payload;
+        (async () => {
+          try {
+            const ans = await PeerService.getAnswer(offer);
+            wsRef.current?.send(
+              JSON.stringify({
+                type: 'peer:nego:done',
+                payload: { to: from, ans },
+              })
+            );
+          } catch (err) {
+            console.error('nego handling failed', err);
+          }
+        })();
+        break;
+      }
+
+      case 'peer:nego:final': {
+        const { ans } = message.payload;
+        (async () => {
+          try {
+            await PeerService.setLocalDescription(ans);
+          } catch (err) {
+            console.error('peer nego final failed', err);
+          }
+        })();
+        break;
+      }
+
+      case 'movement-rejected': {
+        setCurrentUser(prev =>
+          prev
+            ? {
+                ...prev,
+                x: Number(message.payload.x) || prev.x,
+                y: Number(message.payload.y) || prev.y,
+              }
+            : prev
+        );
         toast({
           title: 'Movement rejected',
           description: `You cannot move to (${message.payload.x}, ${message.payload.y})`,
-        })
+        });
         break;
+      }
 
-      case 'user-left':
+      case 'user-left': {
         setUsers(prev => {
           const newUsers = new Map(prev);
-          newUsers.delete(message.payload.userId);
+          newUsers.delete(String(message.payload.userId));
           return newUsers;
         });
         toast({
@@ -286,44 +366,48 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
           description: `User ${message.payload.userId} has left the space`,
         });
         break;
+      }
+
+      default:
+        // ignore unknown events
+        break;
     }
   };
 
   const startCall = async (otherId: string) => {
     try {
       await acquireLocalMedia();
-      // reset previous peer (optional)
       PeerService.reset();
-      // register callbacks for ICE and ontrack
-      PeerService.onIce((candidate) => {
-        // send candidate to the remote via WS
-        wsRef.current?.send(JSON.stringify({
-          type: 'ice:candidate',
-          payload: { to: otherId, candidate }
-        }));
+
+      PeerService.onIce((candidate: any) => {
+        wsRef.current?.send(
+          JSON.stringify({
+            type: 'ice:candidate',
+            payload: { to: otherId, candidate },
+          })
+        );
       });
-      PeerService.onTrack((stream) => {
+
+      PeerService.onTrack((stream: MediaStream) => {
         setRemoteStream(stream);
       });
-  
+
       const offer = await PeerService.getOffer();
-      // send offer to server -> server forwards as "incomming:call"
-      wsRef.current?.send(JSON.stringify({
-        type: 'user:call',
-        payload: { to: otherId, offer }
-      }));
-  
-      // remember we initiated a call
+      wsRef.current?.send(
+        JSON.stringify({
+          type: 'user:call',
+          payload: { to: otherId, offer },
+        })
+      );
+
       pendingCallRef.current = { to: otherId };
     } catch (e) {
-      console.error("startCall failed", e);
+      console.error('startCall failed', e);
     }
   };
-  
+
   const endCall = () => {
-    // reset peer
     PeerService.reset();
-    // stop local tracks
     if (localStream) {
       localStream.getTracks().forEach(t => t.stop());
       setLocalStream(null);
@@ -331,122 +415,114 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
     setRemoteStream(null);
     setInCallWith(null);
     pendingCallRef.current = null;
-    // optionally inform peer via web socket if you want a "call-ended" event
+    // optionally inform server
+    try {
+      wsRef.current?.send(JSON.stringify({ type: 'call:ended', payload: {} }));
+    } catch (e) {
+      /* ignore */
+    }
   };
 
-  
-  useEffect(() => {
-    if (!currentUser || !currentUser.userId) return;
-    users.forEach((user, id) => {
-      if (inCallWith === id) return; // already in call
-      const dist = distanceBetween(currentUser, user);
-      if (dist <= proximityThreshold) {
-        // use deterministic initiator selection to avoid double invites
-        const myId = String(currentUser.id || currentUser.userId); // ensure you use the server id (this.id)
-        const otherId = String(id);
-        const initiator = myId < otherId ? myId : otherId;
-        if (myId === initiator) {
-          // initiator triggers the call
-          startCall(otherId);
-        }
-      }
-    });
-  }, [users, currentUser]);
-  
   const handleSendMessage = (text: string) => {
     if (!currentUser || !spaceId || !text.trim()) return;
 
-    const newMsg = { userId: currentUser.userId, message: text, timestamp: Date.now() };//new object bana rha hai kyu?
+    const newMsg = { userId: currentUser.userId, message: text, timestamp: Date.now() };
     setMessages(prev => [...prev, newMsg]);
 
-    wsRef.current?.send(JSON.stringify({
-      type: 'groupChat',
-      payload: {
-        userId: currentUser.userId,
-        message: text,
-        groupId: spaceId,
-        timestamp: newMsg.timestamp,
-      }
-    }));
+    wsRef.current?.send(
+      JSON.stringify({
+        type: 'groupChat',
+        payload: {
+          userId: currentUser.userId,
+          message: text,
+          groupId: spaceId,
+          timestamp: newMsg.timestamp,
+        },
+      })
+    );
   };
 
-  // Handle user movement
-  const handleMove = (newX: any, newY: any) => {
-    if (!currentUser) return;
-    
-    // Send movement request
-    wsRef.current.send(JSON.stringify({
-      type: 'move',
-      payload: {
-        x: newX,
-        y: newY,
-        userId: currentUser.userId
-      }
-    }));
+  // Send movement request
+  const handleMove = (newX: number, newY: number) => {
+    if (!currentUser || !wsRef.current) return;
+    // clamp to arena bounds
+    const xClamped = Math.max(0, Math.min(newX, arenaWidth - 1));
+    const yClamped = Math.max(0, Math.min(newY, arenaHeight - 1));
+
+    wsRef.current.send(
+      JSON.stringify({
+        type: 'move',
+        payload: {
+          x: xClamped,
+          y: yClamped,
+          userId: currentUser.userId,
+        },
+      })
+    );
   };
 
-  // Draw the arena
+  // Draw the arena + avatars
   useEffect(() => {
-    console.log("render")
     const canvas = canvasRef.current;
     if (!canvas) return;
-    console.log("below render")
-    
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // set canvas pixel size to match grid dimensions (each grid cell = 50px)
+    const cell = 50;
+    const widthPx = arenaWidth * cell;
+    const heightPx = arenaHeight * cell;
+    // keep canvas size updated explicitly
+    if (canvas.width !== widthPx) canvas.width = widthPx;
+    if (canvas.height !== heightPx) canvas.height = heightPx;
+
+    // clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw grid
     ctx.strokeStyle = '#eee';
-    for (let i = 0; i < canvas.width; i += 50) {
+    for (let i = 0; i <= canvas.width; i += cell) {
       ctx.beginPath();
       ctx.moveTo(i, 0);
       ctx.lineTo(i, canvas.height);
       ctx.stroke();
     }
-    for (let i = 0; i < canvas.height; i += 50) {
+    for (let j = 0; j <= canvas.height; j += cell) {
       ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
+      ctx.moveTo(0, j);
+      ctx.lineTo(canvas.width, j);
       ctx.stroke();
     }
 
-    console.log("before curerntusert")
-    console.log(currentUser)
-    // Draw current user
-    if (currentUser && currentUser.x) {
-        console.log("drawing myself")
-        console.log(currentUser)
+    // Draw current user (if present)
+    if (currentUser && typeof currentUser.x === 'number') {
       ctx.beginPath();
       ctx.fillStyle = '#FF6B6B';
-      ctx.arc(currentUser.x * 50, currentUser.y * 50, 20, 0, Math.PI * 2);
+      ctx.arc(currentUser.x * cell + cell / 2, currentUser.y * cell + cell / 2, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('You', currentUser.x * 50, currentUser.y * 50 + 40);
+      ctx.fillText('You', currentUser.x * cell + cell / 2, currentUser.y * cell + cell / 2 + 40);
     }
 
     // Draw other users
     users.forEach(user => {
-    if (!user.x) {
-        return
-    }
-    console.log("drawing other user")
-    console.log(user)
+      if (typeof user.x !== 'number') return;
       ctx.beginPath();
       ctx.fillStyle = '#4ECDC4';
-      ctx.arc(user.x * 50, user.y * 50, 20, 0, Math.PI * 2);
+      ctx.arc(user.x * cell + cell / 2, user.y * cell + cell / 2, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`User ${user.userId}`, user.x * 50, user.y * 50 + 40);
+      ctx.fillText(`User ${user.userId}`, user.x * cell + cell / 2, user.y * cell + cell / 2 + 40);
     });
-  }, [currentUser, users]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, users, arenaWidth, arenaHeight]);
 
   const handleKeyDown = (e: any) => {
     if (!currentUser) return;
-
     const { x, y } = currentUser;
     switch (e.key) {
       case 'ArrowUp':
@@ -461,19 +537,19 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
       case 'ArrowRight':
         handleMove(x + 1, y);
         break;
+      default:
+        break;
     }
   };
 
-  if ( !spaceId) {
+  if (!spaceId) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="text-center py-8">
             <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Space Not Found</h2>
-            <p className="text-muted-foreground mb-6">
-             
-            </p>
+            <p className="text-muted-foreground mb-6"></p>
             <Button onClick={() => navigate('/dashboard')} variant="hero">
               Return to Dashboard
             </Button>
@@ -483,40 +559,41 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
     );
   }
 
-// ctrl + y karne mei mil jayega complete code for the Updated components
-/**
- * 
- * Push the chanegs to the repo
- * 
- * schema update kar
- * locally check if the page loads or not
- * then push the changes to prod
- */
-
   return (
     <div className="p-4" onKeyDown={handleKeyDown} tabIndex={0}>
       <h1 className="text-2xl font-bold mb-4">Arena</h1>
       <div className="mb-4">
-        <p className="text-sm text-gray-600">Token: {token}</p>
+        <p className="text-sm text-gray-600">Token: {token ? token.substring(0, 12) + '...' : 'none'}</p>
         <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
-        <p className="text-sm text-gray-600">Connected Users: {users.size + (currentUser ? 1 : 0)}</p>
-        <Button onClick={() => setChatOpen(true)}>Open Chat</Button>
+        <p className="text-sm text-gray-600">
+          Connected Users: {users.size + (currentUser ? 1 : 0)}
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={() => setChatOpen(true)}>Open Chat</Button>
+          <Button
+            onClick={() => {
+              if (inCallWith) endCall();
+              else if (currentUser) {
+                // try to call first nearby user (simple fallback)
+                const first = Array.from(users.keys())[0];
+                if (first) startCall(first);
+                else toast({ title: 'No users', description: 'No other users to call.' });
+              }
+            }}
+          >
+            {inCallWith ? 'End Call' : 'Call Someone'}
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={length * 50}
-          height={breadth * 50}
-          className="bg-white"
-        />
+        <canvas ref={canvasRef} className="bg-white block" />
       </div>
       <p className="mt-2 text-sm text-gray-500">Use arrow keys to move your avatar</p>
 
-      {/* ✅ Floating Chat Window */}
+      {/* Floating Chat */}
       {chatOpen && (
         <div className="fixed bottom-4 right-4 w-80 bg-white shadow-xl rounded-xl flex flex-col border border-gray-200 z-50">
-          {/* Header */}
           <div className="flex justify-between items-center p-2 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
             <h2 className="font-semibold">Group Chat</h2>
             <Button
@@ -529,18 +606,12 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
             </Button>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-64 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-            {messages.length === 0 && (
-              <p className="text-center text-gray-400 text-sm">No messages yet</p>
-            )}
+            {messages.length === 0 && <p className="text-center text-gray-400 text-sm">No messages yet</p>}
             {messages.map((msg, idx) => {
-              const isMe = msg.userId === currentUser.userId;
+              const isMe = currentUser && msg.userId === currentUser.userId;
               return (
-                <div
-                  key={idx}
-                  className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
                       isMe
@@ -558,14 +629,13 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
             })}
           </div>
 
-          {/* Input */}
           <div className="flex items-center p-2 border-t bg-gray-50 gap-2">
             <Input
               value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
+              onChange={e => setChatInput(e.target.value)}
               placeholder="Type a message..."
               className="flex-1 border-gray-300"
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   handleSendMessage(chatInput);
                   setChatInput('');
@@ -584,7 +654,6 @@ const pendingCallRef = useRef<{ to?: string, from?: string } | null>(null);
           </div>
         </div>
       )}
-
     </div>
   );
 };
