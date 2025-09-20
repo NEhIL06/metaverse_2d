@@ -73,7 +73,7 @@ export class User {
                                 y: this.y
                             },
                             userId:this.userId,
-                            users: RoomManager.getInstance().rooms.get(spaceId)?.filter(x => x.id !== this.id)?.map((u) => ({id: u.userId,})) ?? []// users ka id jo us room mei hai
+                            users: RoomManager.getInstance().rooms.get(spaceId)?.filter(x => x.id !== this.id)?.map((u) => ({id: u.userId, x: u.x,y: u.y})) ?? []// users ka id jo us room mei hai
                         }
                     });
                     console.log("jouin receiverdf5")
@@ -143,18 +143,19 @@ export class User {
                     break;
 
                 case "user:call":
-                    console.log("User call from", this.id, "to", parsedData.payload.to);
-                    const to = parsedData.payload.to;
-                    const offer = parsedData.payload.offer;
-                    RoomManager.getInstance().sendOffer({
-                        type: "incomming:call",
-                        payload: {
-                            from: this.id,
+                        console.log("User call from", this.userId, "to", parsedData.payload.to);
+                        const to = parsedData.payload.to;
+                        const offer = parsedData.payload.offer;
+                        RoomManager.getInstance().sendOffer({
+                          type: "incomming:call",
+                          payload: {
+                            from: this.userId,   // ✅ send real userId, not random this.id
                             offer
-                        }
-                    }, to, this.spaceId!);
-                    console.log("incomming:call sent");
-                    break;
+                          }
+                        }, to, this.spaceId!);
+                        console.log("incomming:call sent");
+                        break;
+                      
 
                 case "call:accepted":
                     console.log("Call accepted from", this.id, "to", parsedData.payload.to);
