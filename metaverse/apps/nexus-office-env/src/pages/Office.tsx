@@ -241,23 +241,17 @@ const Office = () => {
       }
 
       case 'incomming:call': {
-        // server forwards the offer to called
         console.log('Incoming call from', message.payload.from);
         const { from, offer } = message.payload;
         const accept = window.confirm(`Incoming call from ${from}. Accept?`);
-        if (!accept) {
-          // could send a rejection message to server here if implemented
-          return;
-        }
-
+        if (!accept) return;
+      
         (async () => {
           try {
-            await acquireLocalMedia();
-            PeerService.reset();
-            // ensure PeerService has the stream
-            if (localStream) {
-              PeerService.addLocalStream(localStream);
-            }
+            PeerService.reset(); // reset first
+            const stream = await acquireLocalMedia(); // now re-acquire
+            PeerService.addLocalStream(stream); // attach fresh stream
+      
             PeerService.onIce((candidate: any) => {
               wsRef.current?.send(
                 JSON.stringify({
@@ -266,9 +260,12 @@ const Office = () => {
                 })
               );
             });
-            PeerService.onTrack((stream: MediaStream) => setRemoteStream(stream));
-
-            // getAnswer will set remote description, create answer and set local desc
+      
+            PeerService.onTrack((stream: MediaStream) => {
+              console.log("✅ Remote track received", stream);
+              setRemoteStream(stream);
+            });
+      
             const ans = await PeerService.getAnswer(offer);
             wsRef.current?.send(
               JSON.stringify({
@@ -283,6 +280,7 @@ const Office = () => {
         })();
         break;
       }
+      
 
       case 'call:accepted': {
         // initiator receives answer
@@ -383,9 +381,7 @@ const Office = () => {
     try {
       PeerService.reset();
       const stream = await acquireLocalMedia();
-      if (stream) {
-        PeerService.addLocalStream(stream);
-      }
+      PeerService.addLocalStream(stream);
       console.log('Starting call to', otherId);
       PeerService.onIce((candidate: any) => {
         wsRef.current?.send(
