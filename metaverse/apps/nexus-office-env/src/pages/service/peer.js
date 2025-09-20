@@ -1,9 +1,9 @@
 // PeerService.js
 class PeerService {
   constructor() {
-    this._makePeer();
     this.onTrackCallback = null;
     this.onIceCallback = null;
+    this._makePeer();
   }
 
   _makePeer() {
@@ -13,21 +13,35 @@ class PeerService {
       ],
     });
 
-    // ontrack -> call callback with stream
+    // attach listeners
     this.peer.ontrack = (ev) => {
-      // ev.streams is typically available; combine them into one stream if multiple
-      const remoteStream = ev.streams && ev.streams[0] ? ev.streams[0] : new MediaStream();
-      if (this.onTrackCallback) this.onTrackCallback(remoteStream);
+      const remoteStream = ev.streams?.[0] || new MediaStream();
+      if (this.onTrackCallback) {
+        this.onTrackCallback(remoteStream);
+      }
     };
 
-    // onicecandidate -> pass candidate outward
     this.peer.onicecandidate = (ev) => {
       if (ev.candidate && this.onIceCallback) {
         this.onIceCallback(ev.candidate);
       }
     };
+
+    // re-apply callbacks if set before reset
+    if (this.onTrackCallback) this.onTrack(this.onTrackCallback);
+    if (this.onIceCallback) this.onIce(this.onIceCallback);
   }
 
+  // Create offer (initiator)
+  async getOffer() {
+    if (!this.peer) this._makePeer();
+    // Ensure we have tracks already
+    const offer = await this.peer.createOffer();
+    await this.peer.setLocalDescription(offer);
+    return offer;
+  }
+
+  // Handle incoming offer (callee)
   async getAnswer(offer) {
     if (!this.peer) this._makePeer();
     await this.peer.setRemoteDescription(offer);
@@ -36,42 +50,42 @@ class PeerService {
     return ans;
   }
 
-  async setLocalDescription(ans) {
-    // NOTE: your original setLocalDescription set remote description; keep naming but
-    // behave like "setRemoteDescriptionFromAnswer" for initiator.
+  // Apply remote answer (initiator)
+  async setRemoteAnswer(ans) {
     if (!this.peer) this._makePeer();
     await this.peer.setRemoteDescription(ans);
   }
 
-  async getOffer() {
-    if (!this.peer) this._makePeer();
-    const offer = await this.peer.createOffer();
-    await this.peer.setLocalDescription(offer);
-    return offer;
-  }
-
-  // Add tracks from local stream so they are sent to the remote peer
+  // Add local tracks BEFORE calling getOffer() or getAnswer()
   addLocalStream(stream) {
     if (!this.peer) this._makePeer();
     stream.getTracks().forEach((t) => this.peer.addTrack(t, stream));
   }
 
-  // Add remote ICE candidate received from remote peer
   async addIceCandidate(candidate) {
     if (!this.peer) return;
     try {
       await this.peer.addIceCandidate(candidate);
     } catch (e) {
-      // sometimes candidate is null or already handled; ignore safely
       console.warn("addIceCandidate error", e);
     }
   }
 
-  // register callbacks
-  onTrack(cb) { this.onTrackCallback = cb; }
-  onIce(cb) { this.onIceCallback = cb; }
+  onTrack(cb) {
+    this.onTrackCallback = cb;
+    if (this.peer) this.peer.ontrack = (ev) => {
+      const remoteStream = ev.streams?.[0] || new MediaStream();
+      cb(remoteStream);
+    };
+  }
 
-  // Reset peer connection
+  onIce(cb) {
+    this.onIceCallback = cb;
+    if (this.peer) this.peer.onicecandidate = (ev) => {
+      if (ev.candidate) cb(ev.candidate);
+    };
+  }
+
   reset() {
     if (this.peer) {
       try { this.peer.close(); } catch (e) {}
