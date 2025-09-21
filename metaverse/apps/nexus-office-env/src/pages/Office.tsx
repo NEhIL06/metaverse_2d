@@ -281,6 +281,7 @@ const Office = () => {
         break;
       }
       
+      
 
       case 'call:accepted': {
         // initiator receives answer
@@ -379,6 +380,7 @@ const Office = () => {
 
   const startCall = async (otherId: string) => {
     try {
+      await acquireLocalMedia();
       PeerService.reset();
       const stream = await acquireLocalMedia();
       PeerService.addLocalStream(stream);
