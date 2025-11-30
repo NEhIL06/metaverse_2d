@@ -286,10 +286,10 @@ flowchart TD
     C -->|Valid| D[Assign to Room]
     C -->|Invalid| E[Reject Connection]
     
-    D --> F[Send spawn & existing users]
+    D --> F[Send spawn and existing users]
     D --> G[Broadcast user-joined]
     
-    H[User A Moves] -->|move {x,y}| B
+    H[User A Moves] -->|move x,y| B
     B --> I{Validate Movement}
     I -->|Valid| J[Update Room State]
     I -->|Invalid| K[Send movement-rejected]
