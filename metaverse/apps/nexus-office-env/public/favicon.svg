@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9333EA" />
+      <stop offset="50%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#logo-grad)" />
+  <g stroke="#0F172A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Main Center Tower -->
+    <path d="M22 46V20C22 18.3431 23.3431 17 25 17H39C40.6569 17 42 18.3431 42 20V46" />
+    <!-- Left Wing -->
+    <path d="M22 30H17C15.3431 30 14 31.3431 14 33V46" />
+    <!-- Right Wing -->
+    <path d="M42 30H47C48.6569 30 50 31.3431 50 33V46" />
+    <!-- Bottom line -->
+    <path d="M11 46H53" />
+    <!-- Horizontal window lines in center tower -->
+    <path d="M27 24H37" />
+    <path d="M27 29H37" />
+    <path d="M27 34H37" />
+    <path d="M27 39H37" />
+  </g>
+</svg>

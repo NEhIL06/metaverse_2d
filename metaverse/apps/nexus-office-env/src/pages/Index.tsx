@@ -95,10 +95,10 @@ const Index = () => {
                 <Zap className="w-4 h-4 text-warning" />
                 <span>Real-time Updates</span>
               </div>
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <Github className="w-4 h-4 text-accent" />
                 <span>Open Source</span>
-              </div>
+              </div> */}
             </div>
           </div>
         </section>
@@ -147,7 +147,7 @@ const Index = () => {
                   Ready to build your virtual office?
                 </h2>
                 <p className="text-xl text-primary-foreground/90 mb-8">
-                  Join thousands of teams already collaborating in virtual workspaces.
+                  Join your team and collaborate in virtual workspaces.
                 </p>
                 <Button asChild size="lg" variant="secondary" className="gap-2">
                   <Link to="/signup">
