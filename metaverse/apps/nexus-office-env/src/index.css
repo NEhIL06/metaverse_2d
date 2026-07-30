@@ -112,4 +112,28 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Sleek Custom Scrollbar - Advanced Scroll Pro */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background: linear-gradient(180deg, #6366f1 0%, #ec4899 100%);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #f43f5e 100%);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+  }
 }
