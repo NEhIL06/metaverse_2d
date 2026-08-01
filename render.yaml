@@ -43,6 +43,10 @@ services:
     runtime: static
     buildCommand: cd metaverse && pnpm install && pnpm --filter nexus-office-env build
     staticPublishPath: metaverse/apps/nexus-office-env/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: https://metaverse-http-api.onrender.com
