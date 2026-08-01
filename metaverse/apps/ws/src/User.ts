@@ -32,6 +32,11 @@ export class User {
     }
 
     initHandlers() {
+        this.ws.on("close", () => {
+            console.log("[WS CLOSE] User disconnected:", this.userId);
+            this.destroy();
+        });
+
         this.ws.on("message", async (data) => {
             console.log(data)
             const parsedData = JSON.parse(data.toString());
@@ -61,13 +66,23 @@ export class User {
                         return;
                     }
                     console.log("jouin receiverdfd 4")
-                    this.spaceId = spaceId
                     this.spaceId = spaceId;
-                    // Spawn users in central office hub area so they land right next to desks & co-workers
-                    const centerX = Math.floor((space.width || 20) / 2);
-                    const centerY = Math.floor((space.height || 20) / 2);
-                    this.x = Math.max(0, Math.min(space.width - 1, centerX + Math.floor((Math.random() - 0.5) * 6)));
-                    this.y = Math.max(0, Math.min(space.height - 1, centerY + Math.floor((Math.random() - 0.5) * 6)));
+                    // Add user to RoomManager so they appear in room lists and receive broadcasts
+                    RoomManager.getInstance().addUser(spaceId, this);
+
+                    // Check if client provided a saved position on page refresh/rejoin
+                    const prefX = Number(parsedData.payload?.x);
+                    const prefY = Number(parsedData.payload?.y);
+
+                    if (!isNaN(prefX) && !isNaN(prefY) && prefX >= 0 && prefX < space.width && prefY >= 0 && prefY < space.height) {
+                        this.x = prefX;
+                        this.y = prefY;
+                    } else {
+                        const centerX = Math.floor((space.width || 20) / 2);
+                        const centerY = Math.floor((space.height || 20) / 2);
+                        this.x = Math.max(0, Math.min(space.width - 1, centerX + Math.floor((Math.random() - 0.5) * 6)));
+                        this.y = Math.max(0, Math.min(space.height - 1, centerY + Math.floor((Math.random() - 0.5) * 6)));
+                    }
 
                     this.send({
                         type: "space-joined",

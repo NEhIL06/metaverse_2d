@@ -112,7 +112,24 @@ const Office = () => {
 
     ws.onopen = () => {
       setWsConnected(true);
-      ws.send(JSON.stringify({ type: 'join', payload: { spaceId, token } }));
+      localStorage.setItem('activeSpaceId', spaceId);
+      const savedPosStr = localStorage.getItem(`office_pos_${spaceId}`);
+      let savedPos: { x?: number; y?: number } | null = null;
+      try {
+        if (savedPosStr) savedPos = JSON.parse(savedPosStr);
+      } catch (_e) { /* ignore */ }
+
+      ws.send(
+        JSON.stringify({
+          type: 'join',
+          payload: {
+            spaceId,
+            token,
+            x: savedPos?.x,
+            y: savedPos?.y,
+          },
+        })
+      );
     };
 
     ws.onmessage = (ev: MessageEvent) => {
@@ -401,12 +418,21 @@ const Office = () => {
   const handleMove = (newX: number, newY: number) => {
     const cu = useOfficeStore.getState().currentUser;
     if (!cu || !wsRef.current) return;
+    const targetX = Math.max(0, Math.min(newX, arenaWidth - 1));
+    const targetY = Math.max(0, Math.min(newY, arenaHeight - 1));
+
+    // Optimistically update local player position so avatar moves immediately on keypress
+    updateCurrentUserPos(targetX, targetY);
+    if (spaceId) {
+      localStorage.setItem(`office_pos_${spaceId}`, JSON.stringify({ x: targetX, y: targetY }));
+    }
+
     wsRef.current.send(
       JSON.stringify({
         type: 'move',
         payload: {
-          x: Math.max(0, Math.min(newX, arenaWidth - 1)),
-          y: Math.max(0, Math.min(newY, arenaHeight - 1)),
+          x: targetX,
+          y: targetY,
           userId: cu.userId,
         },
       })
