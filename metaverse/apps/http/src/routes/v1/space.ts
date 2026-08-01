@@ -33,70 +33,79 @@ spaceRouter.get("/all",adminMiddleware,async(req,res)=>{
 })
 
 spaceRouter.post("/",adminMiddleware,async(req,res)=>{
+    
     const parsedData = CreateSpaceSchema.safeParse(req.body) // simple ZOD validation 
+    console.log(`[CREATE SPACE] Incoming request from userId: ${req.userId}`, req.body);
     if(!parsedData.success){
-        console.log("parsed data incorrect")
+        console.warn("[CREATE SPACE FAILED] Validation failed:", parsedData.error.format());
         res.status(400).json(parsedData.error);
         return;
     }
-    if(!parsedData.data.mapId){  // Empty Space is being Created
-        console.log("empty space being created")
-        const space = await client.space.create({
-            data: {
-                name: parsedData.data.name,
-                width: parseInt(parsedData.data.dimensions.split("x")[0]),
-                height: parseInt(parsedData.data.dimensions.split("x")[1]),
-                creatorId: req.userId as string
-            }
-        }) 
-        console.log("Empty space created")
-        res.send({ spaceId: space.id })
-        return;
-    }
-    // Checking if the map exists and Getting the Map elements and Ids from the Database to create the Space
-    console.log("Finding a match on MAP ID")
-    const map = await client.map.findUnique({ 
-        where: {
-            id: parsedData.data.mapId
-        },select:{
-            mapElements:true,
-            width: true,
-            height: true
+
+    try {
+        if(!parsedData.data.mapId){  // Empty Space is being Created
+            console.log("[CREATE SPACE] Creating empty space...");
+            const space = await client.space.create({
+                data: {
+                    name: parsedData.data.name,
+                    width: parseInt(parsedData.data.dimensions.split("x")[0]),
+                    height: parseInt(parsedData.data.dimensions.split("x")[1]),
+                    creatorId: req.userId as string
+                }
+            }) 
+            console.log("[CREATE SPACE SUCCESS] Empty space created with ID:", space.id);
+            res.send({ spaceId: space.id });
+            return;
         }
-    })    
-    if(!map){
-        console.log("Map not found")
-        res.status(400).json({message:"Map not found"})
-        return;
-    }
+ // Checking if the map exists and Getting the Map elements and Ids from the Database to crea
+        console.log("[CREATE SPACE] Creating space from mapId:", parsedData.data.mapId);
+        const map = await client.map.findUnique({ 
+            where: {
+                id: parsedData.data.mapId
+            },select:{
+                mapElements:true,
+                width: true,
+                height: true
+            }
+        })    
+        if(!map){
+            console.warn("[CREATE SPACE FAILED] Map template not found:", parsedData.data.mapId);
+            res.status(400).json({message:"Map not found"})
+            return;
+        }
     console.log("Map found Initializing Transaction")
     // A transaction is created to create the space and the elements both simulatenously if either fails neither the space is created nor the space Elements
-    let space = await client.$transaction(async() => {
-        console.log("Transaction for first operation started")
-        const space = await client.space.create({
-            data: {
-                name: parsedData.data.name,
-                width: map.width,
-                height: map.height,
-                creatorId: req.userId as string
-            }
-        })
-        console.log("Space created")
-        await client.spaceElements.createMany({
-            data: map.mapElements.map(e=>{
-                return {
-                    spaceId: space.id,
-                    elementId: e.elementId,
-                    x: e.x!,
-                    y: e.y!
+        let space = await client.$transaction(async() => {
+            const space = await client.space.create({
+                data: {
+                    name: parsedData.data.name,
+                    width: map.width,
+                    height: map.height,
+                    creatorId: req.userId as string
                 }
             })
-        })
-        console.log("Space Elements created")   
-        return space; 
-    })   
-    console.log("Transaction completed")
-    res.send({ spaceId: space.id });
+            await client.spaceElements.createMany({
+                data: map.mapElements.map(e=>{
+                    return {
+                        spaceId: space.id,
+                        elementId: e.elementId,
+                        x: e.x!,
+                        y: e.y!
+                    }
+                })
+            })
+            return space; 
+        })   
+        console.log("[CREATE SPACE SUCCESS] Space created with ID:", space.id);
+        res.send({ spaceId: space.id });
+    } catch (e: any) {
+        console.error("[CREATE SPACE ERROR] Exception during space creation:", e);
+        if (e?.constructor?.name === 'PrismaClientInitializationError' || e?.errorCode === undefined && e?.clientVersion) {
+            res.status(503).json({ message: "Service temporarily unavailable. Database unreachable." });
+            return;
+        }
+        res.status(500).json({ message: "Internal server error creating space" });
+    }
 })
 
 

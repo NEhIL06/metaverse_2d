@@ -17,6 +17,7 @@ export function SignUpForm() {
     username: '',
     password: '',
     confirmPassword: '',
+    type: 'admin' as 'admin' | 'user',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +33,7 @@ export function SignUpForm() {
       await signUp({
         username: formData.username,
         password: formData.password,
-        type: 'admin', // Everyone signs up as admin based on the backend test
+        type: formData.type,
       });
       navigate('/dashboard');
     } catch (error) {
@@ -42,7 +43,7 @@ export function SignUpForm() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value,
@@ -71,10 +72,6 @@ export function SignUpForm() {
             <CardDescription className="text-center">
               Join your team's virtual workspace
             </CardDescription>
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <Shield className="w-4 h-4 text-accent" />
-              <span className="text-xs text-accent font-medium">Admin Access Included</span>
-            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,6 +87,36 @@ export function SignUpForm() {
                   required
                   className="h-11"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="type">Account Type / Role</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'admin' }))}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-all ${
+                      formData.type === 'admin'
+                        ? 'border-primary bg-primary/10 text-primary font-semibold shadow-sm'
+                        : 'border-border bg-background/50 text-muted-foreground hover:bg-background'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'user' }))}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-all ${
+                      formData.type === 'user'
+                        ? 'border-primary bg-primary/10 text-primary font-semibold shadow-sm'
+                        : 'border-border bg-background/50 text-muted-foreground hover:bg-background'
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4" />
+                    User
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">

@@ -21,6 +21,16 @@ app.use(
 
 app.use(express.json());
 
+// Comprehensive Request Logger
+app.use((req, res, next) => {
+  const authHeader = req.headers.authorization ? "Present" : "Missing";
+  console.log(`[HTTP INCOMING] ${req.method} ${req.originalUrl} | AuthHeader: ${authHeader}`);
+  res.on("finish", () => {
+    console.log(`[HTTP RESPONSE] ${req.method} ${req.originalUrl} -> Status: ${res.statusCode}`);
+  });
+  next();
+});
+
 // Routes
 app.use("/api/v1", router);
 

@@ -8,7 +8,7 @@ export interface User {
 export interface SignUpRequest {
   username: string;
   password: string;
-  type: 'admin';
+  type: 'admin' | 'user';
 }
 
 export interface SignInRequest {

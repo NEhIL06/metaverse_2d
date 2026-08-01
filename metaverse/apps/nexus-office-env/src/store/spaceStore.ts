@@ -23,10 +23,18 @@ export const useSpaceStore = create<SpaceState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await spaceAPI.getAll();
-      set({ spaces: response.spaces, isLoading: false });
+      set({
+        spaces: Array.isArray(response?.spaces) ? response.spaces : [],
+        isLoading: false,
+      });
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Failed to load spaces';
-      set({ error: msg, isLoading: false });
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        set({ spaces: [], isLoading: false });
+      } else {
+        const msg = err?.response?.data?.message || 'Failed to load spaces';
+        set({ spaces: [], error: msg, isLoading: false });
+      }
     }
   },
 
