@@ -14,6 +14,7 @@ import {
   Wifi,
   Sparkles,
   Compass,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { spaceAPI } from '@/lib/api';
@@ -24,12 +25,12 @@ import { useOfficeStore } from '@/store/officeStore';
 // ── Color generator for user avatars ──────────────────────────────
 function getUserStyle(userId: string) {
   const palette = [
-    { bg: '#10b981', border: '#047857', glow: 'rgba(16, 185, 129, 0.4)' }, // Emerald
-    { bg: '#8b5cf6', border: '#6d28d9', glow: 'rgba(139, 92, 246, 0.4)' }, // Violet
-    { bg: '#f59e0b', border: '#b45309', glow: 'rgba(245, 158, 11, 0.4)' }, // Amber
-    { bg: '#06b6d4', border: '#0e7490', glow: 'rgba(6, 182, 212, 0.4)' },  // Cyan
-    { bg: '#ec4899', border: '#be185d', glow: 'rgba(236, 72, 153, 0.4)' }, // Pink
-    { bg: '#3b82f6', border: '#1d4ed8', glow: 'rgba(59, 130, 246, 0.4)' }, // Blue
+    { bg: '#10b981', border: '#047857', glow: 'rgba(16, 185, 129, 0.45)' }, // Emerald
+    { bg: '#8b5cf6', border: '#6d28d9', glow: 'rgba(139, 92, 246, 0.45)' }, // Violet
+    { bg: '#f59e0b', border: '#b45309', glow: 'rgba(245, 158, 11, 0.45)' }, // Amber
+    { bg: '#06b6d4', border: '#0e7490', glow: 'rgba(6, 182, 212, 0.45)' },  // Cyan
+    { bg: '#ec4899', border: '#be185d', glow: 'rgba(236, 72, 153, 0.45)' }, // Pink
+    { bg: '#3b82f6', border: '#1d4ed8', glow: 'rgba(59, 130, 246, 0.45)' }, // Blue
   ];
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
@@ -43,6 +44,7 @@ const Office = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const miniMapRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -162,7 +164,6 @@ const Office = () => {
       }
     });
 
-    // Cleanup left users
     posMapRef.current.forEach((_, key) => {
       if (!users.has(key)) posMapRef.current.delete(key);
     });
@@ -189,8 +190,8 @@ const Office = () => {
     switch (message.type) {
       case 'space-joined': {
         try {
-          const spawnX = Number(message.payload?.spawn?.x ?? Math.floor(Math.random() * arenaWidth));
-          const spawnY = Number(message.payload?.spawn?.y ?? Math.floor(Math.random() * arenaHeight));
+          const spawnX = Number(message.payload?.spawn?.x ?? Math.floor(arenaWidth / 2));
+          const spawnY = Number(message.payload?.spawn?.y ?? Math.floor(arenaHeight / 2));
           const userId = message.payload?.userId;
           setCurrentUser({ x: spawnX, y: spawnY, userId });
           myPosRef.current = { currentX: spawnX, currentY: spawnY, targetX: spawnX, targetY: spawnY };
@@ -209,7 +210,7 @@ const Office = () => {
       case 'user-joined': {
         const { userId, x, y } = message.payload;
         upsertUser({ userId: String(userId), x: Number(x) || 0, y: Number(y) || 0 });
-        toast({ title: 'User Entered Space', description: `User ${userId} joined the office` });
+        toast({ title: 'User Entered Office', description: `User ${userId} joined the room` });
         break;
       }
 
@@ -226,7 +227,6 @@ const Office = () => {
 
       case 'movement-rejected': {
         const store = useOfficeStore.getState();
-        // Silently reconcile without spamming loud popup toasts!
         updateCurrentUserPos(
           Number(message.payload.x) ?? store.currentUser?.x ?? 0,
           Number(message.payload.y) ?? store.currentUser?.y ?? 0
@@ -413,10 +413,10 @@ const Office = () => {
     );
   };
 
-  // ── Smooth Canvas Render Loop ─────────────────────────────────────
+  // ── Smooth Canvas Render Loop (Grid-Relative Furniture Layout) ─────
   useEffect(() => {
     let animId: number;
-    const cell = 60; // 60px cell size for richer office detail
+    const cell = 60; // 60px grid cell size
 
     const render = () => {
       const canvas = canvasRef.current;
@@ -435,13 +435,13 @@ const Office = () => {
       const worldHeightPx = arenaHeight * cell;
 
       // Lerp my position
-      myPosRef.current.currentX += (myPosRef.current.targetX - myPosRef.current.currentX) * 0.2;
-      myPosRef.current.currentY += (myPosRef.current.targetY - myPosRef.current.currentY) * 0.2;
+      myPosRef.current.currentX += (myPosRef.current.targetX - myPosRef.current.currentX) * 0.25;
+      myPosRef.current.currentY += (myPosRef.current.targetY - myPosRef.current.currentY) * 0.25;
 
       // Lerp other users
       posMapRef.current.forEach((val) => {
-        val.currentX += (val.targetX - val.currentX) * 0.2;
-        val.currentY += (val.targetY - val.currentY) * 0.2;
+        val.currentX += (val.targetX - val.currentX) * 0.25;
+        val.currentY += (val.targetY - val.currentY) * 0.25;
       });
 
       // Smooth Camera offset
@@ -465,18 +465,18 @@ const Office = () => {
 
       // Clear dark studio background
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#090d16'; // Deep void backdrop
+      ctx.fillStyle = '#090d16'; // Deep studio void
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
       ctx.translate(-cameraX, -cameraY);
 
-      // ── Main Floor (Slate tiles) ───────────────────────────────
+      // ── Main Floor (Slate studio tiles) ─────────────────────────
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(0, 0, worldWidthPx, worldHeightPx);
 
       // Grid tile lines
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 1;
       for (let i = 0; i <= worldWidthPx; i += cell) {
         ctx.beginPath();
@@ -491,140 +491,135 @@ const Office = () => {
         ctx.stroke();
       }
 
-      // ── OFFICE ZONES & FURNITURE ────────────────────────────────
+      // ── PROCEDURAL GRID FURNITURE LAYOUT ────────────────────────
+      // We generate desks, meeting rooms, and lounge pods systematically across grid blocks!
 
-      // 1. EXECUTIVE BOARDROOM (Top-Right Zone)
-      const roomX = Math.max(0, worldWidthPx - 600);
-      const roomY = 0;
-      const roomW = 600;
-      const roomH = 400;
+      const gxCenter = Math.floor(arenaWidth / 2);
+      const gyCenter = Math.floor(arenaHeight / 2);
+
+      // 1. EXECUTIVE BOARDROOM (Placed at Top-Center of Grid)
+      const roomGx = Math.max(0, gxCenter - 4);
+      const roomGy = Math.max(0, gyCenter - 8);
+      const roomPxX = roomGx * cell;
+      const roomPxY = roomGy * cell;
+      const roomW = 8 * cell;
+      const roomH = 5 * cell;
 
       // Mahogany Floor
       ctx.fillStyle = '#451a03';
-      ctx.fillRect(roomX, roomY, roomW, roomH);
+      ctx.fillRect(roomPxX, roomPxY, roomW, roomH);
       ctx.strokeStyle = '#78350f';
       ctx.lineWidth = 4;
-      ctx.strokeRect(roomX, roomY, roomW, roomH);
+      ctx.strokeRect(roomPxX, roomPxY, roomW, roomH);
 
-      // Boardroom Table
+      // Executive Conference Table
       ctx.fillStyle = '#7c2d12';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
       ctx.shadowBlur = 12;
       ctx.beginPath();
-      ctx.roundRect(roomX + 150, roomY + 120, 300, 160, 40);
+      ctx.roundRect(roomPxX + cell, roomPxY + cell * 1.5, roomW - cell * 2, roomH - cell * 3, 24);
       ctx.fill();
       ctx.strokeStyle = '#b45309';
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Boardroom Chairs around table
-      ctx.fillStyle = '#1e293b';
-      for (let xOff = 180; xOff <= 390; xOff += 70) {
-        ctx.beginPath();
-        ctx.arc(roomX + xOff, roomY + 95, 14, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(roomX + xOff, roomY + 305, 14, 0, Math.PI * 2);
-        ctx.fill();
+      // Executive Leather Chairs
+      ctx.fillStyle = '#0f172a';
+      for (let xC = roomPxX + cell * 1.5; xC <= roomPxX + roomW - cell * 1.5; xC += cell * 1.2) {
+        ctx.beginPath(); ctx.arc(xC, roomPxY + cell * 1.1, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(xC, roomPxY + roomH - cell * 1.1, 12, 0, Math.PI * 2); ctx.fill();
       }
 
-      // Presentation TV Screen on Boardroom Wall
+      // Presentation TV Screen
       ctx.fillStyle = '#0284c7';
-      ctx.shadowColor = 'rgba(2, 132, 199, 0.6)';
-      ctx.shadowBlur = 16;
-      ctx.fillRect(roomX + 200, roomY + 10, 200, 12);
+      ctx.shadowColor = 'rgba(2, 132, 199, 0.7)';
+      ctx.shadowBlur = 14;
+      ctx.fillRect(roomPxX + roomW / 2 - 80, roomPxY + 6, 160, 10);
       ctx.shadowBlur = 0;
 
-      // Room Tag
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(roomX + 20, roomY + 20, 180, 28);
+      // Boardroom Label Tag
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(roomPxX + 10, roomPxY + 10, 170, 26);
       ctx.fillStyle = '#fcd34d';
       ctx.font = 'bold 12px Inter, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('🏢 EXECUTIVE BOARDROOM', roomX + 30, roomY + 38);
+      ctx.fillText('🏢 EXECUTIVE BOARDROOM', roomPxX + 18, roomPxY + 27);
 
-      // 2. ENGINEERING HUB (Center-Left Desks)
-      for (let dRow = 0; dRow < 2; dRow++) {
-        for (let dCol = 0; dCol < 3; dCol++) {
-          const deskX = 120 + dCol * 220;
-          const deskY = 150 + dRow * 240;
+      // 2. REPEATING ENGINEERING WORKSTATION DESKS (Across Grid Blocks)
+      for (let gy = 1; gy < arenaHeight; gy += 6) {
+        for (let gx = 1; gx < arenaWidth; gx += 6) {
+          // Skip if inside boardroom or coffee lounge grid box
+          if (gx >= roomGx - 1 && gx <= roomGx + 8 && gy >= roomGy - 1 && gy <= roomGy + 5) continue;
+          if (gx >= gxCenter - 4 && gx <= gxCenter + 4 && gy >= gyCenter + 4 && gy <= gyCenter + 9) continue;
 
-          // Wood Desk Top
+          const deskPxX = gx * cell;
+          const deskPxY = gy * cell;
+
+          // Wood Desk Top (2x1 cells)
           ctx.fillStyle = '#334155';
           ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
           ctx.shadowBlur = 8;
-          ctx.fillRect(deskX, deskY, 160, 80);
+          ctx.fillRect(deskPxX + 10, deskPxY + 10, cell * 2 - 20, cell - 20);
           ctx.shadowBlur = 0;
 
-          // Dual Monitors (Glowing blue)
+          // Glowing Dual Monitors
           ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(deskX + 25, deskY + 15, 50, 6);
-          ctx.fillRect(deskX + 85, deskY + 15, 50, 6);
+          ctx.fillRect(deskPxX + 20, deskPxY + 14, 30, 4);
+          ctx.fillRect(deskPxX + 60, deskPxY + 14, 30, 4);
 
           // Keyboards & Mugs
           ctx.fillStyle = '#64748b';
-          ctx.fillRect(deskX + 50, deskY + 35, 60, 15);
+          ctx.fillRect(deskPxX + 40, deskPxY + 24, 35, 8);
           ctx.fillStyle = '#ef4444';
-          ctx.beginPath();
-          ctx.arc(deskX + 130, deskY + 45, 5, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.beginPath(); ctx.arc(deskPxX + 85, deskYPx(deskPxY), 4, 0, Math.PI * 2); ctx.fill();
 
-          // Ergonomic Desk Chair
+          // Office Chair
           ctx.fillStyle = '#0f172a';
           ctx.beginPath();
-          ctx.arc(deskX + 80, deskY + 110, 18, 0, Math.PI * 2);
+          ctx.arc(deskPxX + cell, deskPxY + cell + 10, 14, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      // Engineering Hub Tag
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(40, 40, 180, 28);
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 12px Inter, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('💻 ENGINEERING WORKSPACE', 50, 58);
+      function deskYPx(dY: number) {
+        return dY + 28;
+      }
 
-      // 3. LOUNGE & COFFEE BAR (Bottom-Right Zone)
-      const lX = Math.max(0, worldWidthPx - 500);
-      const lY = Math.max(0, worldHeightPx - 350);
-      const lW = 500;
-      const lH = 350;
+      // 3. BREAKROOM & COFFEE LOUNGE (Bottom-Center of Grid)
+      const lGx = Math.max(0, gxCenter - 4);
+      const lGy = Math.min(arenaHeight - 5, gyCenter + 4);
+      const lPxX = lGx * cell;
+      const lPxY = lGy * cell;
+      const lW = 8 * cell;
+      const lH = 5 * cell;
 
       // Parquet Wood Floor
       ctx.fillStyle = '#78350f';
-      ctx.fillRect(lX, lY, lW, lH);
+      ctx.fillRect(lPxX, lPxY, lW, lH);
       ctx.strokeStyle = '#b45309';
       ctx.lineWidth = 3;
-      ctx.strokeRect(lX, lY, lW, lH);
+      ctx.strokeRect(lPxX, lPxY, lW, lH);
 
-      // Coffee Bar Counter
+      // Espresso Bar Counter
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(lX + 100, lY + 60, 300, 50);
-      ctx.fillStyle = '#10b981';
-      ctx.font = 'bold 11px Inter, sans-serif';
-      ctx.fillText('☕ ESPRESSO BAR', lX + 200, lY + 90);
-
-      // Plush Sofa
-      ctx.fillStyle = '#065f46';
-      ctx.beginPath();
-      ctx.roundRect(lX + 150, lY + 200, 200, 70, 16);
-      ctx.fill();
-
-      // Potted Plants (Green leaf circles)
-      ctx.fillStyle = '#15803d';
-      ctx.beginPath(); ctx.arc(lX + 40, lY + 60, 24, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(lX + 460, lY + 60, 24, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(lX + 460, lY + 300, 24, 0, Math.PI * 2); ctx.fill();
-
-      // Lounge Tag
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(lX + 20, lY + 20, 160, 28);
+      ctx.fillRect(lPxX + cell, lPxY + cell, lW - cell * 2, cell);
       ctx.fillStyle = '#34d399';
       ctx.font = 'bold 12px Inter, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('🌴 BREAKROOM & LOUNGE', lX + 30, lY + 38);
+      ctx.textAlign = 'center';
+      ctx.fillText('☕ ESPRESSO BAR & LOUNGE', lPxX + lW / 2, lPxY + cell * 1.6);
+
+      // Cozy Sofas
+      ctx.fillStyle = '#065f46';
+      ctx.beginPath();
+      ctx.roundRect(lPxX + cell * 1.5, lPxY + cell * 3, lW - cell * 3, cell * 1.2, 16);
+      ctx.fill();
+
+      // Potted Monstera Plants
+      ctx.fillStyle = '#15803d';
+      ctx.beginPath(); ctx.arc(lPxX + cell * 0.6, lPxY + cell * 0.6, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(lPxX + lW - cell * 0.6, lPxY + cell * 0.6, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(lPxX + lW - cell * 0.6, lPxY + lH - cell * 0.6, 20, 0, Math.PI * 2); ctx.fill();
 
       // ── Outer Boundary Wall ────────────────────────────────────
       ctx.strokeStyle = '#475569';
@@ -707,9 +702,9 @@ const Office = () => {
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // "You" Initial / Icon
+        // "YOU" Icon text
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 15px Inter, sans-serif';
+        ctx.font = 'bold 13px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('YOU', myPxX, myPxY + 5);
 
@@ -728,6 +723,53 @@ const Office = () => {
       }
 
       ctx.restore();
+
+      // ── MINI-MAP RADAR DRAWING ──────────────────────────────────
+      const miniCanvas = miniMapRef.current;
+      if (miniCanvas) {
+        const mCtx = miniCanvas.getContext('2d');
+        if (mCtx) {
+          const mW = 160;
+          const mH = 120;
+          if (miniCanvas.width !== mW) miniCanvas.width = mW;
+          if (miniCanvas.height !== mH) miniCanvas.height = mH;
+
+          mCtx.clearRect(0, 0, mW, mH);
+          mCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          mCtx.fillRect(0, 0, mW, mH);
+
+          const scaleX = mW / arenaWidth;
+          const scaleY = mH / arenaHeight;
+
+          // Boardroom Mini Highlight
+          mCtx.fillStyle = 'rgba(245, 158, 11, 0.4)';
+          mCtx.fillRect(roomGx * scaleX, roomGy * scaleY, 8 * scaleX, 5 * scaleY);
+
+          // Lounge Mini Highlight
+          mCtx.fillStyle = 'rgba(52, 211, 153, 0.4)';
+          mCtx.fillRect(lGx * scaleX, lGy * scaleY, 8 * scaleX, 5 * scaleY);
+
+          // Other users mini dots
+          users.forEach((u) => {
+            if (typeof u.x !== 'number') return;
+            mCtx.fillStyle = '#14b8a6';
+            mCtx.beginPath();
+            mCtx.arc(u.x * scaleX, u.y * scaleY, 3, 0, Math.PI * 2);
+            mCtx.fill();
+          });
+
+          // Current User mini dot (Red)
+          if (currentUser && typeof currentUser.x === 'number') {
+            mCtx.fillStyle = '#ef4444';
+            mCtx.beginPath();
+            mCtx.arc(myPosRef.current.currentX * scaleX, myPosRef.current.currentY * scaleY, 4, 0, Math.PI * 2);
+            mCtx.fill();
+          }
+
+          mCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          mCtx.strokeRect(0, 0, mW, mH);
+        }
+      }
 
       animId = requestAnimationFrame(render);
     };
@@ -842,10 +884,19 @@ const Office = () => {
         <div className="w-full h-full border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative bg-slate-900">
           <canvas ref={canvasRef} className="block w-full h-full cursor-crosshair" />
 
-          {/* Floating Controls Overlay */}
-          <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-800 flex items-center gap-3 text-xs text-slate-400 shadow-xl">
+          {/* Floating Controls Hint */}
+          <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-800 flex items-center gap-3 text-xs text-slate-400 shadow-xl z-30">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>Use <b>Arrow Keys</b> or <b>WASD</b> to move avatar smooth</span>
+          </div>
+
+          {/* Mini-Map Radar HUD Overlay (Bottom-Right) */}
+          <div className="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-md p-2 rounded-xl border border-slate-800 shadow-2xl z-30 flex flex-col items-center gap-1">
+            <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              <MapPin className="w-3 h-3 text-blue-400" />
+              <span>Office Radar</span>
+            </div>
+            <canvas ref={miniMapRef} className="rounded border border-slate-700/60 block" />
           </div>
 
           {/* Video Streams Container */}
