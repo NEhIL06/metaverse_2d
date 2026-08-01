@@ -98,7 +98,8 @@ export class User {
                     const moveY = parsedData.payload.y;
                     const xDisplacement = Math.abs(this.x - moveX);
                     const yDisplacement = Math.abs(this.y - moveY);
-                    if ((xDisplacement == 1 && yDisplacement== 0) || (xDisplacement == 0 && yDisplacement == 1)) {
+                    // Allow up to 2 steps displacement to handle fast arrow-key presses & network jitter
+                    if (xDisplacement <= 2 && yDisplacement <= 2) {
                         this.x = moveX;
                         this.y = moveY;
                         RoomManager.getInstance().broadcast({
@@ -112,6 +113,7 @@ export class User {
                         return;
                     }
                     
+                    console.warn(`[MOVE REJECTED] User ${this.userId} attempted move from (${this.x}, ${this.y}) to (${moveX}, ${moveY})`);
                     this.send({
                         type: "movement-rejected",
                         payload: {
