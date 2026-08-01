@@ -44,10 +44,19 @@ router.post("/signup", async (req, res) => {
             userId: user.id
         })
         return;
-    } catch(e) {
-        console.log("erroer thrown")
-        console.log(e)
-        res.status(400).json({message: "User already exists"})
+    } catch(e: any) {
+        console.error("Signup error:", e)
+        // Prisma unique constraint violation → duplicate username
+        if (e?.code === 'P2002') {
+            res.status(409).json({ message: "Username already taken. Please choose a different one." })
+            return;
+        }
+        // Prisma DB unreachable / not initialized
+        if (e?.constructor?.name === 'PrismaClientInitializationError' || e?.errorCode === undefined && e?.clientVersion) {
+            res.status(503).json({ message: "Service temporarily unavailable. Please try again in a few moments." })
+            return;
+        }
+        res.status(500).json({ message: "Internal server error" })
     }
 })
 
@@ -85,8 +94,13 @@ router.post("/signin", async (req, res) => {
             token
         })
         return;
-    } catch(e) {
-        res.status(400).json({message: "Internal server error"})
+    } catch(e: any) {
+        console.error("Signin error:", e)
+        if (e?.constructor?.name === 'PrismaClientInitializationError' || e?.errorCode === undefined && e?.clientVersion) {
+            res.status(503).json({ message: "Service temporarily unavailable. Please try again in a few moments." })
+            return;
+        }
+        res.status(500).json({ message: "Internal server error" })
     }
 })
 

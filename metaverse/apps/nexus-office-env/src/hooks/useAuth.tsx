@@ -1,7 +1,12 @@
-import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { authAPI } from '@/lib/api';
+import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import type { User, SignUpRequest, SignInRequest } from '@/types/auth';
 import { useToast } from './use-toast';
+
+// ──────────────────────────────────────────────────────────────────
+// Context (kept for backward compat — components that call useAuth()
+// continue to work without changes, while the store is the source of truth)
+// ──────────────────────────────────────────────────────────────────
 
 interface AuthContextType {
   user: User | null;
@@ -15,51 +20,30 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const store = useAuthStore();
   const { toast } = useToast();
 
+  // Mark hydration complete on mount (persist middleware restores state synchronously)
   useEffect(() => {
-    // Check if user is logged in on mount
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-    setIsLoading(false);
+    store.hydrate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signUp = async (data: SignUpRequest) => {
     try {
-      const response = await authAPI.signUp(data);
-      localStorage.setItem('token', response.token);
-      
-      const userData: User = {
-        id: response.userId,
-        username: data.username,
-        type: data.type,
-      };
-      
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      
+      await store.signUp(data);
       toast({
-        title: "Account created",
-        description: "Welcome to Virtual Office!",
+        title: 'Account created',
+        description: 'Welcome to Virtual Office!',
       });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to create account';
+      const message =
+        error?.response?.data?.message || 'Failed to create account';
       toast({
-        title: "Error",
+        title: 'Error',
         description: message,
-        variant: "destructive",
+        variant: 'destructive',
       });
       throw error;
     }
@@ -67,53 +51,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (data: SignInRequest) => {
     try {
-      const response = await authAPI.signIn(data);
-      localStorage.setItem('token', response.token);
-      console.log("SignIn response:", response.token);
-      console.log("localStorage:", localStorage.getItem('token'));
-      const userData: User = {
-        id: response.userId,
-        username: data.username,
-        type: 'admin', // Based on the test file, everyone signs up as admin
-      };
-      
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      
+      await store.signIn(data);
       toast({
-        title: "Welcome back!",
-        description: "Successfully signed in.",
+        title: 'Welcome back!',
+        description: 'Successfully signed in.',
       });
     } catch (error: unknown) {
-      const message = error.toString() || 'Failed to sign in';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = (error as any)?.response?.data?.message || 'Failed to sign in';
       toast({
-        title: "Error",
+        title: 'Error',
         description: message,
-        variant: "destructive",
+        variant: 'destructive',
       });
       throw error;
     }
   };
 
   const signOut = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+    store.signOut();
     toast({
-      title: "Signed out",
-      description: "See you next time!",
+      title: 'Signed out',
+      description: 'See you next time!',
     });
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user,
-        isLoading,
+        user: store.user,
+        isLoading: store.isLoading,
         signUp,
         signIn,
         signOut,
-        isAuthenticated: !!user,
+        isAuthenticated: store.isAuthenticated,
       }}
     >
       {children}

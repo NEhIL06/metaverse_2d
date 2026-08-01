@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { spaceAPI } from '@/lib/api';
-import type { Space } from '@/types/space';
+import { useSpaceStore } from '@/store/spaceStore';
 import { SpaceList } from '@/components/dashboard/SpaceList';
 import { CreateSpaceModal } from '@/components/dashboard/CreateSpaceModal';
 import { JoinSpaceModal } from '@/components/dashboard/JoinSpaceModal';
@@ -10,68 +9,55 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Building2, Users, Sparkles, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import type { Space } from '@/types/space';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Global space state via Zustand store
+  const { spaces, isLoading, error, fetchSpaces, addSpace, removeSpace, clearError } = useSpaceStore();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
 
   useEffect(() => {
-    loadSpaces();
-  }, []);
+    fetchSpaces();
+  }, [fetchSpaces]);
 
-  const loadSpaces = async () => {
-    try {
-      setIsLoading(true);
-      const response = await spaceAPI.getAll();
-      setSpaces(response.spaces);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load spaces",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+  // Surface store errors as toasts
+  useEffect(() => {
+    if (error) {
+      toast({ title: 'Error', description: error, variant: 'destructive' });
+      clearError();
     }
-  };
+  }, [error, toast, clearError]);
 
   const handleSpaceCreated = (newSpace: { spaceId: string; name: string; dimensions: string }) => {
     setShowCreateModal(false);
-    loadSpaces(); // Reload spaces to get the new one
+    // Optimistically add and then refresh for full data
+    fetchSpaces();
     toast({
-      title: "Space created!",
+      title: 'Space created!',
       description: `${newSpace.name} is ready for collaboration`,
     });
   };
 
   const handleSpaceDeleted = async (spaceId: string) => {
-    try {
-      await spaceAPI.delete(spaceId);
-      setSpaces(prev => prev.filter(s => s.id !== spaceId));
-      toast({
-        title: "Space deleted",
-        description: "The space has been permanently deleted",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete space",
-        variant: "destructive",
-      });
+    await removeSpace(spaceId);
+    if (!error) {
+      toast({ title: 'Space deleted', description: 'The space has been permanently deleted' });
     }
   };
 
-  const mySpaces = spaces.filter(space => space.creatorId === user?.id);
-  const joinedSpaces = spaces.filter(space => space.creatorId !== user?.id);
+  const mySpaces = spaces.filter((space: Space) => space.creatorId === user?.id);
+  const joinedSpaces = spaces.filter((space: Space) => space.creatorId !== user?.id);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <DashboardHeader user={user} />
-      
+
       <main className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
@@ -95,12 +81,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">{mySpaces.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Spaces you've created
-              </p>
+              <p className="text-xs text-muted-foreground">Spaces you've created</p>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-card border-0 shadow-md">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Joined Spaces</CardTitle>
@@ -108,9 +92,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-accent">{joinedSpaces.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Collaborative workspaces
-              </p>
+              <p className="text-xs text-muted-foreground">Collaborative workspaces</p>
             </CardContent>
           </Card>
 
@@ -123,16 +105,13 @@ export default function Dashboard() {
               <div className="text-2xl font-bold bg-gradient-hero bg-clip-text text-transparent">
                 {spaces.length}
               </div>
-              <p className="text-xs text-muted-foreground">
-                All available spaces
-              </p>
+              <p className="text-xs text-muted-foreground">All available spaces</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Create Space CTA */}
           <Card className="bg-gradient-hero border-0 shadow-xl text-primary-foreground">
             <CardHeader>
               <CardTitle className="text-xl">Create New Space</CardTitle>
@@ -153,7 +132,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Join Space CTA */}
           <Card className="bg-gradient-accent border-0 shadow-xl text-accent-foreground">
             <CardHeader>
               <CardTitle className="text-xl">Join Existing Space</CardTitle>
@@ -184,14 +162,12 @@ export default function Dashboard() {
           onDeleteSpace={handleSpaceDeleted}
         />
 
-        {/* Create Space Modal */}
         <CreateSpaceModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSpaceCreated={handleSpaceCreated}
         />
 
-        {/* Join Space Modal */}
         <JoinSpaceModal
           isOpen={showJoinModal}
           onClose={() => setShowJoinModal(false)}

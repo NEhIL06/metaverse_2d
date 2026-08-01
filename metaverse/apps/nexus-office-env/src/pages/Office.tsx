@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,183 +8,118 @@ import { Button } from '@/components/ui/button';
 import { spaceAPI } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import PeerService from './service/peer';
-
-type UserMap = Map<string, { x: number; y: number; userId: string }>;
+import { useOfficeStore } from '@/store/officeStore';
+import { useState } from 'react';
 
 const Office = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [inCallWith, setInCallWith] = useState<string | null>(null); // user id we are in call with
-  const pendingCallRef = useRef<{ to?: string; from?: string } | null>(null);
-
-  const proximityThreshold = 3; // distance threshold to trigger call (grid units)
-
-  function distanceBetween(userA: { x: number; y: number }, userB: { x: number; y: number }) {
-    const dx = userA.x - userB.x;
-    const dy = userA.y - userB.y;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
   const { toast } = useToast();
+  const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ x: number; y: number; userId?: string } | null>(
-    null
-  );
-  const [users, setUsers] = useState<UserMap>(new Map());
-  const [messages, setMessages] = useState<any[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
-  const [arenaWidth, setArenaWidth] = useState<number>(10); // default grid width (units)
-  const [arenaHeight, setArenaHeight] = useState<number>(8); // default grid height (units)
-  const navigate = useNavigate();
+
+  // ── Zustand office store ──────────────────────────────────────────
+  const {
+    arenaWidth, arenaHeight, setArenaDimensions,
+    currentUser, setCurrentUser, updateCurrentUserPos,
+    users, upsertUser, removeUser, updateUserPos,
+    messages, addMessage,
+    inCallWith, setInCallWith,
+    localStream, setLocalStream,
+    remoteStream, setRemoteStream,
+    setWsConnected,
+    resetOffice,
+  } = useOfficeStore();
+  // ─────────────────────────────────────────────────────────────────
 
   const token = localStorage.getItem('token') || '';
-
   const webSocketUrl = import.meta.env.VITE_WS_URL;
 
-  // initialize websocket + fetch space dims
-  useEffect(() => {
-    if (!webSocketUrl || !spaceId) {
-      console.warn('Missing WS URL or spaceId');
-      return;
-    }
+  const proximityThreshold = 3;
 
-    // fetch space dimensions first
+  function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }) {
+    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+  }
+
+  // ── WebSocket + space dims init ───────────────────────────────────
+  useEffect(() => {
+    if (!webSocketUrl || !spaceId) return;
+
+    // fetch space dimensions
     spaceAPI
       .getById(spaceId)
       .then((sp: any) => {
-        if (sp && sp.dimensions) {
-          // expect "W x H" as "100x200"
-          const parts = String(sp.dimensions).split('x').map(s => s.trim());
-          const w = Number(parts[0]) || arenaWidth;
-          const h = Number(parts[1]) || arenaHeight;
-          setArenaWidth(w);
-          setArenaHeight(h);
-          console.log('Space dims', w, h);
+        if (sp?.dimensions) {
+          const parts = String(sp.dimensions).split('x').map((s: string) => s.trim());
+          setArenaDimensions(Number(parts[0]) || arenaWidth, Number(parts[1]) || arenaHeight);
         }
       })
-      .catch(error => {
-        console.error('Error fetching space:', error);
-      });
+      .catch((err: any) => console.error('Error fetching space:', err));
 
     const ws = new WebSocket(webSocketUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          type: 'join',
-          payload: {
-            spaceId,
-            token,
-          },
-        })
-      );
+      setWsConnected(true);
+      ws.send(JSON.stringify({ type: 'join', payload: { spaceId, token } }));
     };
 
-    ws.onmessage = (ev: MessageEvent<any>) => {
+    ws.onmessage = (ev: MessageEvent) => {
       try {
-        const message = JSON.parse(ev.data);
-        handleWebSocketMessage(message);
+        handleWsMessage(JSON.parse(ev.data));
       } catch (err) {
         console.error('invalid ws message', err);
       }
     };
 
     ws.onclose = () => {
+      setWsConnected(false);
       console.log('websocket closed');
     };
 
-    ws.onerror = e => {
-      console.error('ws error', e);
-    };
+    ws.onerror = (e) => console.error('ws error', e);
 
     return () => {
-      try {
-        ws.close();
-      } catch (e) {
-        /* ignore */
-      }
+      ws.close();
       wsRef.current = null;
+      resetOffice();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spaceId, webSocketUrl]);
 
-  // When users or currentUser changes, check proximity and initiate deterministic calls
+  // ── Proximity → auto-call ─────────────────────────────────────────
   useEffect(() => {
-    if (!currentUser || !currentUser.userId) return;
-
+    if (!currentUser?.userId) return;
     users.forEach((user) => {
       if (inCallWith === user.userId) return;
-      // skip self if server included current user in users list
       if (String(user.userId) === String(currentUser.userId)) return;
-      const dist = distanceBetween(currentUser as any, user as any);
-      if (dist <= proximityThreshold) {
+      if (distanceBetween(currentUser as any, user) <= proximityThreshold) {
         const myId = String(currentUser.userId);
         const otherId = String(user.userId);
-        console.log(`Users ${myId} and ${otherId} are within proximity`);
-        const initiator = myId < otherId ? myId : otherId;
-        if (myId === initiator) {
-          startCall(otherId);
-        }
-
-
+        if (myId < otherId) startCall(otherId);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [users, currentUser, inCallWith]);
 
-  const acquireLocalMedia = async () => {
-    if (localStream) return localStream;
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      setLocalStream(s);
-      // attach tracks to PeerService so getOffer() will include them to the PeerConnection
-      try {
-        PeerService.addLocalStream(s);
-      } catch (e) {
-        // PeerService may expect stream to be added later — ok to ignore failure here
-        console.warn('PeerService.addLocalStream failed', e);
-      }
-      return s;
-    } catch (e) {
-      toast({ title: 'Media error', description: 'Camera/Mic permission required.' });
-      throw e;
-    }
-  };
-
-  const handleWebSocketMessage = (message: any) => {
-    if (!message || !message.type) return;
+  // ── WS message handler ────────────────────────────────────────────
+  const handleWsMessage = (message: any) => {
+    if (!message?.type) return;
     switch (message.type) {
       case 'space-joined': {
-        // server sends spawn coords and list of users
         try {
           const spawnX = Number(message.payload?.spawn?.x ?? Math.floor(Math.random() * arenaWidth));
           const spawnY = Number(message.payload?.spawn?.y ?? Math.floor(Math.random() * arenaHeight));
           const userId = message.payload?.userId;
-          setCurrentUser({
-            x: spawnX,
-            y: spawnY,
-            userId,
-          });
-          toast({
-            title: 'Joined space',
-            description: `You have joined space ${message.payload.spaceId}`,
-          });
+          setCurrentUser({ x: spawnX, y: spawnY, userId });
+          toast({ title: 'Joined space', description: `You joined space ${spaceId}` });
 
-          const userMap: UserMap = new Map();
           (message.payload?.users ?? []).forEach((u: any) => {
-            if (!u || !u.userId) return;
-            // don't include ourself in the 'other users' list
-            if (String(u.userId) === String(userId)) return;
-            userMap.set(String(u.userId), {
-              x: Number(u.x) || 0,
-              y: Number(u.y) || 0,
-              userId: String(u.userId),
-            });
+            if (!u?.userId || String(u.userId) === String(userId)) return;
+            upsertUser({ userId: String(u.userId), x: Number(u.x) || 0, y: Number(u.y) || 0 });
           });
-          setUsers(userMap);
         } catch (e) {
           console.error('space-joined handling error', e);
         }
@@ -192,317 +127,197 @@ const Office = () => {
       }
 
       case 'user-joined': {
-        const payload = message.payload;
-        setUsers(prev => {
-          const newUsers = new Map(prev);
-          newUsers.set(String(payload.userId), {
-            x: Number(payload.x) || 0,
-            y: Number(payload.y) || 0,
-            userId: String(payload.userId),
-          });
-          toast({
-            title: 'User joined',
-            description: `User ${payload.userId} has joined the space`,
-          });
-          return newUsers;
-        });
+        const { userId, x, y } = message.payload;
+        upsertUser({ userId: String(userId), x: Number(x) || 0, y: Number(y) || 0 });
+        toast({ title: 'User joined', description: `User ${userId} joined` });
         break;
       }
 
       case 'movement': {
         const p = message.payload;
-        // if movement belongs to current user, update currentUser coords
-        if (currentUser && String(p.userId) === String(currentUser.userId)) {
-          setCurrentUser(prev => (prev ? { ...prev, x: Number(p.x) || prev.x, y: Number(p.y) || prev.y } : prev));
+        const store = useOfficeStore.getState();
+        if (store.currentUser && String(p.userId) === String(store.currentUser.userId)) {
+          updateCurrentUserPos(Number(p.x) || store.currentUser.x, Number(p.y) || store.currentUser.y);
         } else {
-          setUsers(prev => {
-            const newUsers = new Map(prev);
-            const u = newUsers.get(String(p.userId));
-            if (u) {
-              u.x = Number(p.x) || u.x;
-              u.y = Number(p.y) || u.y;
-              newUsers.set(String(p.userId), u);
-            } else {
-              newUsers.set(String(p.userId), {
-                x: Number(p.x) || 0,
-                y: Number(p.y) || 0,
-                userId: String(p.userId),
-              });
-            }
-            return newUsers;
-          });
+          updateUserPos(String(p.userId), Number(p.x) || 0, Number(p.y) || 0);
         }
         break;
       }
 
-      case 'groupChat': {
-        setMessages(prev => [...prev, message.payload]);
+      case 'movement-rejected': {
+        const store = useOfficeStore.getState();
+        updateCurrentUserPos(
+          Number(message.payload.x) || store.currentUser?.x || 0,
+          Number(message.payload.y) || store.currentUser?.y || 0,
+        );
+        toast({ title: 'Movement rejected', description: `Cannot move to (${message.payload.x}, ${message.payload.y})` });
         break;
       }
 
+      case 'groupChat':
+        addMessage({
+          userId: message.payload.userId || 'unknown',
+          message: message.payload.message,
+          timestamp: message.payload.timestamp || Date.now(),
+        });
+        break;
+
+      case 'user-left':
+        removeUser(String(message.payload.userId));
+        toast({ title: 'User left', description: `User ${message.payload.userId} left` });
+        break;
+
       case 'incomming:call': {
-        console.log('Incoming call from', message.payload.from);
         const { from, offer } = message.payload;
         const accept = window.confirm(`Incoming call from ${from}. Accept?`);
         if (!accept) return;
-      
         (async () => {
           try {
-            PeerService.reset(); // reset first
-            const stream = await acquireLocalMedia(); // now re-acquire
-            PeerService.addLocalStream(stream); // attach fresh stream
-      
-            PeerService.onIce((candidate: any) => {
-              wsRef.current?.send(
-                JSON.stringify({
-                  type: 'ice:candidate',
-                  payload: { to: from, candidate },
-                })
-              );
-            });
-      
-            PeerService.onTrack((stream: MediaStream) => {
-              console.log("✅ Remote track received", stream);
-              setRemoteStream(stream);
-            });
-      
-            const ans = await PeerService.getAnswer(offer);
-            wsRef.current?.send(
-              JSON.stringify({
-                type: 'call:accepted',
-                payload: { to: from, ans },
-              })
+            PeerService.reset();
+            const stream = await acquireLocalMedia();
+            PeerService.addLocalStream(stream);
+            PeerService.onIce((candidate: any) =>
+              wsRef.current?.send(JSON.stringify({ type: 'ice:candidate', payload: { to: from, candidate } }))
             );
+            PeerService.onTrack((s: MediaStream) => setRemoteStream(s));
+            const ans = await PeerService.getAnswer(offer);
+            wsRef.current?.send(JSON.stringify({ type: 'call:accepted', payload: { to: from, ans } }));
             setInCallWith(from);
-          } catch (err) {
-            console.error('error accepting call', err);
-          }
+          } catch (err) { console.error('error accepting call', err); }
         })();
         break;
       }
-      
-      
 
       case 'call:accepted': {
-        // initiator receives answer
         const { from, ans } = message.payload;
         (async () => {
           try {
-            // assume this sets remote description for the initiator
             await PeerService.setRemoteAnswer(ans);
             setInCallWith(from);
-          } catch (err) {
-            console.error('error setting remote desc', err);
-          }
+          } catch (err) { console.error('error setting remote desc', err); }
         })();
         break;
       }
 
-      case 'ice:candidate': {
-        const { candidate } = message.payload;
+      case 'ice:candidate':
         (async () => {
-          if (candidate) {
-            try {
-              await PeerService.addIceCandidate(candidate);
-            } catch (err) {
-              console.warn('addIceCandidate failed', err);
-            }
+          if (message.payload.candidate) {
+            try { await PeerService.addIceCandidate(message.payload.candidate); }
+            catch (err) { console.warn('addIceCandidate failed', err); }
           }
         })();
         break;
-      }
 
       case 'peer:nego:needed': {
         const { from, offer } = message.payload;
         (async () => {
           try {
             const ans = await PeerService.getAnswer(offer);
-            wsRef.current?.send(
-              JSON.stringify({
-                type: 'peer:nego:done',
-                payload: { to: from, ans },
-              })
-            );
-          } catch (err) {
-            console.error('nego handling failed', err);
-          }
+            wsRef.current?.send(JSON.stringify({ type: 'peer:nego:done', payload: { to: from, ans } }));
+          } catch (err) { console.error('nego handling failed', err); }
         })();
         break;
       }
 
-      case 'peer:nego:final': {
-        const { ans } = message.payload;
+      case 'peer:nego:final':
         (async () => {
-          try {
-            await PeerService.setRemoteAnswer(ans);
-          } catch (err) {
-            console.error('peer nego final failed', err);
-          }
+          try { await PeerService.setRemoteAnswer(message.payload.ans); }
+          catch (err) { console.error('peer nego final failed', err); }
         })();
         break;
-      }
-
-      case 'movement-rejected': {
-        setCurrentUser(prev =>
-          prev
-            ? {
-                ...prev,
-                x: Number(message.payload.x) || prev.x,
-                y: Number(message.payload.y) || prev.y,
-              }
-            : prev
-        );
-        toast({
-          title: 'Movement rejected',
-          description: `You cannot move to (${message.payload.x}, ${message.payload.y})`,
-        });
-        break;
-      }
-
-      case 'user-left': {
-        setUsers(prev => {
-          const newUsers = new Map(prev);
-          newUsers.delete(String(message.payload.userId));
-          return newUsers;
-        });
-        toast({
-          title: 'User left',
-          description: `User ${message.payload.userId} has left the space`,
-        });
-        break;
-      }
 
       default:
-        // ignore unknown events
         break;
+    }
+  };
+
+  // ── Media / call helpers ──────────────────────────────────────────
+  const acquireLocalMedia = async (): Promise<MediaStream> => {
+    const current = useOfficeStore.getState().localStream;
+    if (current) return current;
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      setLocalStream(s);
+      try { PeerService.addLocalStream(s); } catch (e) { console.warn('PeerService.addLocalStream failed', e); }
+      return s;
+    } catch (e) {
+      toast({ title: 'Media error', description: 'Camera/Mic permission required.' });
+      throw e;
     }
   };
 
   const startCall = async (otherId: string) => {
     try {
-      await acquireLocalMedia();
       PeerService.reset();
       const stream = await acquireLocalMedia();
       PeerService.addLocalStream(stream);
-      console.log('Starting call to', otherId);
-      PeerService.onIce((candidate: any) => {
-        wsRef.current?.send(
-          JSON.stringify({
-            type: 'ice:candidate',
-            payload: { to: otherId, candidate },
-          })
-        );
-      });
-      console.log(`otherId is ${otherId} and this userId is ${currentUser?.userId}`);
-
-      PeerService.onTrack((stream: MediaStream) => {
-        console.log("✅ Remote track received", stream);
-        setRemoteStream(stream);
-      });
-
-      const offer = await PeerService.getOffer();
-      wsRef.current?.send(
-        JSON.stringify({
-          type: 'user:call',
-          payload: { to: otherId, offer },
-        })
+      PeerService.onIce((candidate: any) =>
+        wsRef.current?.send(JSON.stringify({ type: 'ice:candidate', payload: { to: otherId, candidate } }))
       );
-      console.log('Offer sent to', otherId);
-      pendingCallRef.current = { to: otherId };
-    } catch (e) {
-      console.error('startCall failed', e);
-    }
+      PeerService.onTrack((s: MediaStream) => setRemoteStream(s));
+      const offer = await PeerService.getOffer();
+      wsRef.current?.send(JSON.stringify({ type: 'user:call', payload: { to: otherId, offer } }));
+    } catch (e) { console.error('startCall failed', e); }
   };
 
   const endCall = () => {
     PeerService.reset();
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      setLocalStream(null);
-    }
+    const current = useOfficeStore.getState().localStream;
+    if (current) { current.getTracks().forEach((t) => t.stop()); setLocalStream(null); }
     setRemoteStream(null);
     setInCallWith(null);
-    pendingCallRef.current = null;
-    // optionally inform server
-    try {
-      wsRef.current?.send(JSON.stringify({ type: 'call:ended', payload: {} }));
-    } catch (e) {
-      /* ignore */
-    }
+    try { wsRef.current?.send(JSON.stringify({ type: 'call:ended', payload: {} })); } catch (_e) { /* ignore */ }
   };
 
   const handleSendMessage = (text: string) => {
-    if (!currentUser || !spaceId || !text.trim()) return;
-
-    const newMsg = { userId: currentUser.userId, message: text, timestamp: Date.now() };
-    setMessages(prev => [...prev, newMsg]);
-
-    wsRef.current?.send(
-      JSON.stringify({
-        type: 'groupChat',
-        payload: {
-          userId: currentUser.userId,
-          message: text,
-          groupId: spaceId,
-          timestamp: newMsg.timestamp,
-        },
-      })
-    );
+    const cu = useOfficeStore.getState().currentUser;
+    if (!cu || !spaceId || !text.trim()) return;
+    const ts = Date.now();
+    addMessage({ userId: cu.userId || '', message: text, timestamp: ts });
+    wsRef.current?.send(JSON.stringify({
+      type: 'groupChat',
+      payload: { userId: cu.userId, message: text, groupId: spaceId, timestamp: ts },
+    }));
   };
 
-  // Send movement request
   const handleMove = (newX: number, newY: number) => {
-    if (!currentUser || !wsRef.current) return;
-    // clamp to arena bounds
-    const xClamped = Math.max(0, Math.min(newX, arenaWidth - 1));
-    const yClamped = Math.max(0, Math.min(newY, arenaHeight - 1));
-
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'move',
-        payload: {
-          x: xClamped,
-          y: yClamped,
-          userId: currentUser.userId,
-        },
-      })
-    );
+    const cu = useOfficeStore.getState().currentUser;
+    if (!cu || !wsRef.current) return;
+    wsRef.current.send(JSON.stringify({
+      type: 'move',
+      payload: {
+        x: Math.max(0, Math.min(newX, arenaWidth - 1)),
+        y: Math.max(0, Math.min(newY, arenaHeight - 1)),
+        userId: cu.userId,
+      },
+    }));
   };
 
-  // Draw the arena + avatars
+  // ── Canvas drawing ────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // set canvas pixel size to match grid dimensions (each grid cell = 50px)
     const cell = 50;
     const widthPx = arenaWidth * cell;
     const heightPx = arenaHeight * cell;
-    // keep canvas size updated explicitly
     if (canvas.width !== widthPx) canvas.width = widthPx;
     if (canvas.height !== heightPx) canvas.height = heightPx;
 
-    // clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid
+    // Grid
     ctx.strokeStyle = '#eee';
     for (let i = 0; i <= canvas.width; i += cell) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
     }
     for (let j = 0; j <= canvas.height; j += cell) {
-      ctx.beginPath();
-      ctx.moveTo(0, j);
-      ctx.lineTo(canvas.width, j);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
     }
 
-    // Draw current user (if present)
+    // Current user
     if (currentUser && typeof currentUser.x === 'number') {
       ctx.beginPath();
       ctx.fillStyle = '#FF6B6B';
@@ -514,8 +329,8 @@ const Office = () => {
       ctx.fillText('You', currentUser.x * cell + cell / 2, currentUser.y * cell + cell / 2 + 40);
     }
 
-    // Draw other users
-    users.forEach(user => {
+    // Other users
+    users.forEach((user) => {
       if (typeof user.x !== 'number') return;
       ctx.beginPath();
       ctx.fillStyle = '#4ECDC4';
@@ -526,30 +341,20 @@ const Office = () => {
       ctx.textAlign = 'center';
       ctx.fillText(`User ${user.userId}`, user.x * cell + cell / 2, user.y * cell + cell / 2 + 40);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, users, arenaWidth, arenaHeight]);
 
+  // ── Keyboard movement ─────────────────────────────────────────────
   const handleKeyDown = (e: any) => {
-    if (!currentUser) return;
-    const { x, y } = currentUser;
-    switch (e.key) {
-      case 'ArrowUp':
-        handleMove(x, y - 1);
-        break;
-      case 'ArrowDown':
-        handleMove(x, y + 1);
-        break;
-      case 'ArrowLeft':
-        handleMove(x - 1, y);
-        break;
-      case 'ArrowRight':
-        handleMove(x + 1, y);
-        break;
-      default:
-        break;
-    }
+    const cu = useOfficeStore.getState().currentUser;
+    if (!cu) return;
+    const { x, y } = cu;
+    if (e.key === 'ArrowUp') handleMove(x, y - 1);
+    else if (e.key === 'ArrowDown') handleMove(x, y + 1);
+    else if (e.key === 'ArrowLeft') handleMove(x - 1, y);
+    else if (e.key === 'ArrowRight') handleMove(x + 1, y);
   };
 
+  // ── Guards ────────────────────────────────────────────────────────
   if (!spaceId) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
@@ -567,22 +372,19 @@ const Office = () => {
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="p-4" onKeyDown={handleKeyDown} tabIndex={0}>
       <h1 className="text-2xl font-bold mb-4">Arena</h1>
       <div className="mb-4">
-        <p className="text-sm text-gray-600">Token: {token ? token.substring(0, 12) + '...' : 'none'}</p>
         <p className="text-sm text-gray-600">Space ID: {spaceId}</p>
-        <p className="text-sm text-gray-600">
-          Connected Users: {users.size + (currentUser ? 1 : 0)}
-        </p>
+        <p className="text-sm text-gray-600">Connected Users: {users.size + (currentUser ? 1 : 0)}</p>
         <div className="flex gap-2">
           <Button onClick={() => setChatOpen(true)}>Open Chat</Button>
           <Button
             onClick={() => {
               if (inCallWith) endCall();
-              else if (currentUser) {
-                // try to call first nearby user (simple fallback)
+              else {
                 const first = Array.from(users.keys())[0];
                 if (first) startCall(first);
                 else toast({ title: 'No users', description: 'No other users to call.' });
@@ -593,29 +395,19 @@ const Office = () => {
           </Button>
         </div>
         <div className="flex gap-4 mt-4">
-  {localStream && (
-    <video
-      autoPlay
-      muted
-      playsInline
-      ref={video => {
-        if (video && localStream) video.srcObject = localStream;
-      }}
-      className="w-48 h-36 bg-black rounded"
-    />
-  )}
-  {remoteStream && (
-  <video
-    autoPlay
-    playsInline
-    ref={video => {
-      if (video && remoteStream) video.srcObject = remoteStream;
-    }}
-    className="w-48 h-36 bg-black rounded"
-  />
-)}
-</div>
-
+          {localStream && (
+            <video autoPlay muted playsInline
+              ref={(v) => { if (v && localStream) v.srcObject = localStream; }}
+              className="w-48 h-36 bg-black rounded"
+            />
+          )}
+          {remoteStream && (
+            <video autoPlay playsInline
+              ref={(v) => { if (v && remoteStream) v.srcObject = remoteStream; }}
+              className="w-48 h-36 bg-black rounded"
+            />
+          )}
+        </div>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -628,32 +420,20 @@ const Office = () => {
         <div className="fixed bottom-4 right-4 w-80 bg-white shadow-xl rounded-xl flex flex-col border border-gray-200 z-50">
           <div className="flex justify-between items-center p-2 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
             <h2 className="font-semibold">Group Chat</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20"
-              onClick={() => setChatOpen(false)}
-            >
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20" onClick={() => setChatOpen(false)}>
               <X size={16} />
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-64 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-64">
             {messages.length === 0 && <p className="text-center text-gray-400 text-sm">No messages yet</p>}
             {messages.map((msg, idx) => {
-              const isMe = currentUser && msg.userId === currentUser.userId;
+              const cu = useOfficeStore.getState().currentUser;
+              const isMe = cu && msg.userId === cu.userId;
               return (
                 <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
-                      isMe
-                        ? 'bg-blue-600 text-white rounded-br-none'
-                        : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                    }`}
-                  >
-                    <p className="text-xs font-semibold opacity-80 mb-0.5">
-                      {isMe ? 'You' : `User ${msg.userId}`}
-                    </p>
+                  <div className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
+                    <p className="text-xs font-semibold opacity-80 mb-0.5">{isMe ? 'You' : `User ${msg.userId}`}</p>
                     <p className="text-sm leading-snug">{msg.message}</p>
                   </div>
                 </div>
@@ -664,23 +444,14 @@ const Office = () => {
           <div className="flex items-center p-2 border-t bg-gray-50 gap-2">
             <Input
               value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
+              onChange={(e) => setChatInput(e.target.value)}
               placeholder="Type a message..."
               className="flex-1 border-gray-300"
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  handleSendMessage(chatInput);
-                  setChatInput('');
-                }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { handleSendMessage(chatInput); setChatInput(''); }
               }}
             />
-            <Button
-              onClick={() => {
-                handleSendMessage(chatInput);
-                setChatInput('');
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
+            <Button onClick={() => { handleSendMessage(chatInput); setChatInput(''); }} className="bg-blue-600 hover:bg-blue-700 text-white">
               Send
             </Button>
           </div>
