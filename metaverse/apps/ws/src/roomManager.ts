@@ -28,7 +28,9 @@ export class RoomManager {
             this.rooms.set(spaceId, [user]);
             return;
         }
-        this.rooms.set(spaceId, [...(this.rooms.get(spaceId) ?? []), user]);
+        // Deduplicate: filter out any existing stale connection with the same userId
+        const existingUsers = (this.rooms.get(spaceId) ?? []).filter((u) => u.userId !== user.userId);
+        this.rooms.set(spaceId, [...existingUsers, user]);
     }
 
     public broadcast(message: OutgoingMessage, user: User, roomId: string) {

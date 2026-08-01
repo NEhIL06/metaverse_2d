@@ -62,36 +62,27 @@ export class User {
                     }
                     console.log("jouin receiverdfd 4")
                     this.spaceId = spaceId
+                    this.spaceId = spaceId;
                     RoomManager.getInstance().addUser(spaceId, this);
                     this.x = Math.floor(Math.random() * space.width);
-                    this.y = Math.floor(Math.random() * space.height);// this is just for testing the APIs
+                    this.y = Math.floor(Math.random() * space.height);
+
                     this.send({
                         type: "space-joined",
                         payload: {
-                            spawn: {
-                                x: this.x,
-                                y: this.y
-                            },
-                            userId:this.userId,
-                            users: RoomManager.getInstance().rooms.get(spaceId)?.filter(x => x.id !== this.id)?.map((u) => ({id: u.userId, x: u.x,y: u.y})) ?? []// users ka id jo us room mei hai
+                            spawn: { x: this.x, y: this.y },
+                            userId: this.userId,
+                            users: RoomManager.getInstance().rooms.get(spaceId)
+                                ?.filter(x => x.userId !== this.userId)
+                                ?.map(u => ({
+                                    userId: u.userId,
+                                    x: u.x,
+                                    y: u.y
+                                })) ?? []
                         }
                     });
-                    this.send({
-                        type: "space-joined",
-                        payload: {
-                          spawn: { x: this.x, y: this.y },
-                          userId: this.userId,   // ✅ use userId
-                          users: RoomManager.getInstance().rooms.get(spaceId)
-                            ?.filter(x => x.id !== this.id)
-                            ?.map(u => ({
-                              userId: u.userId,   // ✅ not u.id
-                              x: u.x,
-                              y: u.y
-                            })) ?? []
-                        }
-                      });
-                      
-                    console.log("jouin receiverdf5")
+
+                    console.log("[WS JOIN] User joined space successfully:", this.userId, "spawn:", this.x, this.y);
                     RoomManager.getInstance().broadcast({
                         type: "user-joined",
                         payload: {
@@ -113,6 +104,7 @@ export class User {
                         RoomManager.getInstance().broadcast({
                             type: "movement",
                             payload: {
+                                userId: this.userId,
                                 x: this.x,
                                 y: this.y
                             }

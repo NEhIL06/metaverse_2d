@@ -137,9 +137,9 @@ const Office = () => {
         const p = message.payload;
         const store = useOfficeStore.getState();
         if (store.currentUser && String(p.userId) === String(store.currentUser.userId)) {
-          updateCurrentUserPos(Number(p.x) || store.currentUser.x, Number(p.y) || store.currentUser.y);
-        } else {
-          updateUserPos(String(p.userId), Number(p.x) || 0, Number(p.y) || 0);
+          updateCurrentUserPos(Number(p.x) ?? store.currentUser.x, Number(p.y) ?? store.currentUser.y);
+        } else if (p?.userId) {
+          updateUserPos(String(p.userId), Number(p.x) ?? 0, Number(p.y) ?? 0);
         }
         break;
       }
@@ -147,20 +147,32 @@ const Office = () => {
       case 'movement-rejected': {
         const store = useOfficeStore.getState();
         updateCurrentUserPos(
-          Number(message.payload.x) || store.currentUser?.x || 0,
-          Number(message.payload.y) || store.currentUser?.y || 0,
+          Number(message.payload.x) ?? store.currentUser?.x ?? 0,
+          Number(message.payload.y) ?? store.currentUser?.y ?? 0,
         );
         toast({ title: 'Movement rejected', description: `Cannot move to (${message.payload.x}, ${message.payload.y})` });
         break;
       }
 
-      case 'groupChat':
+      case 'groupChat': {
+        const msgUserId = message.payload.userId || 'unknown';
+        const msgText = message.payload.message;
         addMessage({
-          userId: message.payload.userId || 'unknown',
-          message: message.payload.message,
+          userId: msgUserId,
+          message: msgText,
           timestamp: message.payload.timestamp || Date.now(),
         });
+
+        // Show floating toast notification for incoming chat messages
+        const cu = useOfficeStore.getState().currentUser;
+        if (cu && String(msgUserId) !== String(cu.userId)) {
+          toast({
+            title: `💬 Chat from User ${msgUserId}`,
+            description: msgText,
+          });
+        }
         break;
+      }
 
       case 'user-left':
         removeUser(String(message.payload.userId));
@@ -293,7 +305,7 @@ const Office = () => {
     }));
   };
 
-  // ── Canvas drawing ────────────────────────────────────────────────
+  // ── Canvas drawing (Player Camera Viewport) ────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -301,50 +313,123 @@ const Office = () => {
     if (!ctx) return;
 
     const cell = 50;
-    const widthPx = arenaWidth * cell;
-    const heightPx = arenaHeight * cell;
-    if (canvas.width !== widthPx) canvas.width = widthPx;
-    if (canvas.height !== heightPx) canvas.height = heightPx;
+    const worldWidthPx = arenaWidth * cell;
+    const worldHeightPx = arenaHeight * cell;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Fixed responsive viewport dimensions (1000px x 600px or parent container size)
+    const container = canvas.parentElement;
+    const viewportWidth = container ? Math.min(container.clientWidth, 1200) : 1000;
+    const viewportHeight = 650;
 
-    // Grid
-    ctx.strokeStyle = '#eee';
-    for (let i = 0; i <= canvas.width; i += cell) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-    }
-    for (let j = 0; j <= canvas.height; j += cell) {
-      ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
-    }
+    if (canvas.width !== viewportWidth) canvas.width = viewportWidth;
+    if (canvas.height !== viewportHeight) canvas.height = viewportHeight;
 
-    // Current user
+    // Calculate Camera offsets centered on the Current User ("You")
+    let cameraX = 0;
+    let cameraY = 0;
     if (currentUser && typeof currentUser.x === 'number') {
-      ctx.beginPath();
-      ctx.fillStyle = '#FF6B6B';
-      ctx.arc(currentUser.x * cell + cell / 2, currentUser.y * cell + cell / 2, 20, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('You', currentUser.x * cell + cell / 2, currentUser.y * cell + cell / 2 + 40);
+      const playerPxX = currentUser.x * cell + cell / 2;
+      const playerPxY = currentUser.y * cell + cell / 2;
+      cameraX = playerPxX - viewportWidth / 2;
+      cameraY = playerPxY - viewportHeight / 2;
     }
+
+    // Clamp camera within world boundaries if arena is larger than viewport
+    if (worldWidthPx > viewportWidth) {
+      cameraX = Math.max(0, Math.min(cameraX, worldWidthPx - viewportWidth));
+    } else {
+      cameraX = (worldWidthPx - viewportWidth) / 2; // center small map
+    }
+
+    if (worldHeightPx > viewportHeight) {
+      cameraY = Math.max(0, Math.min(cameraY, worldHeightPx - viewportHeight));
+    } else {
+      cameraY = (worldHeightPx - viewportHeight) / 2; // center small map
+    }
+
+    // Clear viewport
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0f172a'; // Slate dark background outside the map
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    // Shift context by negative camera coordinates
+    ctx.translate(-cameraX, -cameraY);
+
+    // Map background (Arena boundary)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, worldWidthPx, worldHeightPx);
+
+    // Grid lines within world boundary
+    ctx.strokeStyle = '#f1f5f9';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= worldWidthPx; i += cell) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, worldHeightPx); ctx.stroke();
+    }
+    for (let j = 0; j <= worldHeightPx; j += cell) {
+      ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(worldWidthPx, j); ctx.stroke();
+    }
+
+    // Border around arena
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, worldWidthPx, worldHeightPx);
 
     // Other users
     users.forEach((user) => {
       if (typeof user.x !== 'number') return;
+      const userPxX = user.x * cell + cell / 2;
+      const userPxY = user.y * cell + cell / 2;
+
       ctx.beginPath();
-      ctx.fillStyle = '#4ECDC4';
-      ctx.arc(user.x * cell + cell / 2, user.y * cell + cell / 2, 20, 0, Math.PI * 2);
+      ctx.fillStyle = '#14b8a6'; // Teal accent
+      ctx.arc(userPxX, userPxY, 18, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.font = '14px Arial';
+      ctx.strokeStyle = '#0f766e';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 12px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`User ${user.userId}`, user.x * cell + cell / 2, user.y * cell + cell / 2 + 40);
+      ctx.fillText(`User ${user.userId}`, userPxX, userPxY + 34);
     });
+
+    // Current user ("You")
+    if (currentUser && typeof currentUser.x === 'number') {
+      const myPxX = currentUser.x * cell + cell / 2;
+      const myPxY = currentUser.y * cell + cell / 2;
+
+      // Glow halo around current player
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+      ctx.arc(myPxX, myPxY, 26, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Main dot
+      ctx.beginPath();
+      ctx.fillStyle = '#ef4444'; // Bright Red
+      ctx.arc(myPxX, myPxY, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b91c1c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // "You" Badge
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 13px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('You', myPxX, myPxY + 36);
+    }
+
+    ctx.restore();
   }, [currentUser, users, arenaWidth, arenaHeight]);
 
-  // ── Keyboard movement ─────────────────────────────────────────────
-  const handleKeyDown = (e: any) => {
+  // ── Keyboard movement & Focus ─────────────────────────────────────
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+      e.preventDefault(); // Prevent page scrolling
+    }
     const cu = useOfficeStore.getState().currentUser;
     if (!cu) return;
     const { x, y } = cu;
